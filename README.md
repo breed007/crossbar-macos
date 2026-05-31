@@ -1,4 +1,4 @@
-# Crossbar
+# crossbar
 
 **Enable or disable macOS network services right from the menu bar — without digging through System Settings.**
 
@@ -7,10 +7,10 @@
 ![Language](https://img.shields.io/badge/Swift-AppKit-orange)
 
 <p align="center">
-  <img src="docs/popover.png" alt="Crossbar popover showing network services" width="420">
+  <img src="docs/popover.png" alt="crossbar popover showing network services" width="420">
 </p>
 
-## Why Crossbar?
+## Why crossbar?
 
 Turning a network interface on or off on macOS is buried. To make Wi-Fi or an
 Ethernet adapter inactive you have to open **System Settings → Network**, find
@@ -19,7 +19,7 @@ clicks deep, every time. And once you're juggling more than one connection,
 System Settings won't tell you at a glance *which* service is actually carrying
 your traffic.
 
-Crossbar collapses that into a menu bar dropdown: every network service, its
+crossbar collapses that into a menu bar dropdown: every network service, its
 current state, and a switch. One click to flip it. That's the whole app.
 
 ## What it does
@@ -39,7 +39,7 @@ current state, and a switch. One click to flip it. That's the whole app.
   service is disabled, so "I left something off" is visible at a glance.
 
 <p align="center">
-  <img src="docs/details.png" alt="Crossbar in the menu bar with per-service hover detail" width="460">
+  <img src="docs/details.png" alt="crossbar in the menu bar with per-service hover detail" width="460">
 </p>
 
 ## Requirements
@@ -51,10 +51,10 @@ current state, and a switch. One click to flip it. That's the whole app.
 
 ### Option 1 — Download the prebuilt app
 
-1. Download the latest `Crossbar-vX.Y.Z-universal.zip` from the
+1. Download the latest `crossbar-vX.Y.Z-universal.zip` from the
    [**Releases**](https://github.com/breed007/crossbar-macos/releases/latest) page.
 2. Unzip it and move **Crossbar.app** to `/Applications`.
-3. Crossbar is **not notarized** (no paid Apple Developer ID), so macOS
+3. crossbar is **not notarized** (no paid Apple Developer ID), so macOS
    quarantines downloaded copies. Clear the quarantine flag once:
    ```sh
    xattr -dr com.apple.quarantine /Applications/Crossbar.app
@@ -77,7 +77,7 @@ Then copy the built `Crossbar.app` to `/Applications`.
 
 ---
 
-Crossbar runs as a menu bar **agent** — no Dock icon, no app-switcher entry.
+crossbar runs as a menu bar **agent** — no Dock icon, no app-switcher entry.
 Look for the globe-with-crossbar glyph in your menu bar; click it to open the
 list. Quit from the popover's footer.
 
@@ -86,7 +86,7 @@ list. Quit from the popover's footer.
 ### 1. Enable toggling (required) — a scoped passwordless `sudo` rule
 
 Reading network state needs no privileges, but *changing* it requires root.
-Crossbar's v1 backend runs Apple's `networksetup` tool via `sudo`. To avoid a
+crossbar's v1 backend runs Apple's `networksetup` tool via `sudo`. To avoid a
 password prompt on every toggle, add a narrowly-scoped sudoers rule:
 
 ```sh
@@ -102,15 +102,15 @@ breed ALL=(root) NOPASSWD: /usr/sbin/networksetup -setnetworkserviceenabled *
 This grants passwordless `sudo` for **only** that one `networksetup`
 subcommand — nothing else — which is a reasonable tradeoff on a personal Mac.
 Deleting `/etc/sudoers.d/crossbar` fully reverts it. Until the rule is in place,
-Crossbar still runs and shows everything; it just explains how to install the
+crossbar still runs and shows everything; it just explains how to install the
 rule the first time you try to toggle.
 
 ### 2. Wi-Fi network name (optional) — Location Services
 
-To display the connected Wi-Fi SSID, Crossbar needs **Location Services**
-permission. This isn't a Crossbar quirk: since macOS 14 the system withholds the
+To display the connected Wi-Fi SSID, crossbar needs **Location Services**
+permission. This isn't a crossbar quirk: since macOS 14 the system withholds the
 SSID from any app that lacks location authorization (CoreWLAN, `networksetup`,
-and `system_profiler` all redact it). Crossbar requests it with a one-time
+and `system_profiler` all redact it). crossbar requests it with a one-time
 prompt on first launch and **never starts location updates** — simply holding
 the authorization is what unlocks the network name.
 
@@ -120,7 +120,7 @@ the authorization is what unlocks the network name.
 
 ## How it works
 
-Crossbar is built around one fact: **reading network state is unprivileged;
+crossbar is built around one fact: **reading network state is unprivileged;
 changing it requires root.** Those two halves are cleanly separated by a
 privilege boundary.
 
@@ -140,24 +140,24 @@ Built natively in Swift + AppKit. No third-party dependencies.
 
 ## Privacy
 
-- **No network calls, no telemetry, no analytics.** Crossbar only reads local
+- **No network calls, no telemetry, no analytics.** crossbar only reads local
   system configuration and toggles local services.
 - **Location** permission, if granted, is used *solely* to read your Wi-Fi
-  SSID locally — it never leaves your Mac, and Crossbar requests no location
+  SSID locally — it never leaves your Mac, and crossbar requests no location
   updates.
 - The passwordless `sudo` rule is scoped to exactly one `networksetup`
   subcommand.
 
 ## Scope (and non-goals)
 
-Crossbar deliberately does one thing well. It intentionally **does not** do
+crossbar deliberately does one thing well. It intentionally **does not** do
 network service priority reordering, location switching, proxy or VPN
 configuration, or bandwidth/speed/public-IP tooling. If you need those, the
 per-service **Network Settings…** link opens Apple's native pane.
 
 ## Contributing
 
-Issues and PRs are welcome. Crossbar is intentionally small — please keep
+Issues and PRs are welcome. crossbar is intentionally small — please keep
 changes focused on its one job: seeing and toggling network services from the
 menu bar.
 
