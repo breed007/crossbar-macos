@@ -25,6 +25,7 @@ First release.
 - **Hover details**: route state, IP address, router.
 - Menu bar **icon badge** when a service is disabled.
 - Popover footer: **Network Settings…** deep link and **Quit**.
+- **Application icon** (globe + crossbar) for Finder and Get Info.
 - **Universal** build (Apple Silicon + Intel).
 
 [0.1.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.1.0

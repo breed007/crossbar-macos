@@ -18,6 +18,7 @@
 		1A0000000000000000000048 /* PrivilegedToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000038 /* PrivilegedToggle.swift */; };
 		1A0000000000000000000049 /* NetworksetupToggle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000039 /* NetworksetupToggle.swift */; };
 		1A000000000000000000004A /* WiFiSSIDProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000003A /* WiFiSSIDProvider.swift */; };
+		1A0000000000000000000062 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000061 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +34,7 @@
 		1A0000000000000000000038 /* PrivilegedToggle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivilegedToggle.swift; sourceTree = "<group>"; };
 		1A0000000000000000000039 /* NetworksetupToggle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworksetupToggle.swift; sourceTree = "<group>"; };
 		1A000000000000000000003A /* WiFiSSIDProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiFiSSIDProvider.swift; sourceTree = "<group>"; };
+		1A0000000000000000000061 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,8 +72,17 @@
 				1A0000000000000000000009 /* Privileged */,
 				1A0000000000000000000006 /* StatusItem */,
 				1A0000000000000000000007 /* UI */,
+				1A0000000000000000000060 /* Resources */,
 			);
 			path = Crossbar;
+			sourceTree = "<group>";
+		};
+		1A0000000000000000000060 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000000000000000000061 /* Assets.xcassets */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		1A0000000000000000000009 /* Privileged */ = {
@@ -178,6 +189,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A0000000000000000000062 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -252,6 +264,7 @@
 		1A0000000000000000000024 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -274,6 +287,7 @@
 		1A0000000000000000000025 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
