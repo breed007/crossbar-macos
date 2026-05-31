@@ -161,6 +161,10 @@ Issues and PRs are welcome. Crossbar is intentionally small — please keep
 changes focused on its one job: seeing and toggling network services from the
 menu bar.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## License
 
 [MIT](LICENSE) © 2026 breed007
