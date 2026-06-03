@@ -22,6 +22,10 @@ final class StatusItemController {
 
     private var cancellable: AnyCancellable?
 
+    /// Tracks the icon's current alert state so we only regenerate the (drawn)
+    /// glyph when it actually flips, not on every published snapshot.
+    private var iconShowsAlert: Bool?
+
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
@@ -36,19 +40,31 @@ final class StatusItemController {
             button.target = self
         }
 
-        // Reflect overall state in the menu bar: badge the icon when any
-        // service is disabled, so "I left something off" is visible at a glance.
+        // Reflect overall state in the menu bar. We only alert when there's no
+        // active route at all — i.e. nothing is currently carrying traffic —
+        // which is a genuine "attention needed" signal. Badging on "any service
+        // disabled" would be permanently lit on the many Macs that ship with an
+        // inactive service (e.g. a stale Thunderbolt Bridge), defeating its use.
         cancellable = monitor.$services
+            .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] services in self?.updateIcon(for: services) }
     }
 
     private func updateIcon(for services: [NetworkServiceState]) {
-        let somethingDisabled = services.contains { !$0.isEnabled }
-        statusItem.button?.image = StatusBarIcon.image(alert: somethingDisabled)
-        statusItem.button?.toolTip = somethingDisabled
-            ? "Crossbar — a network service is disabled"
+        // "Needs attention" = there are services but none is the active route.
+        // An empty list (e.g. transient during refresh) is not treated as alert.
+        let hasActiveRoute = services.contains { $0.isPrimary }
+        let alert = !services.isEmpty && !hasActiveRoute
+
+        statusItem.button?.toolTip = alert
+            ? "Crossbar — no network is currently routing traffic"
             : "Crossbar"
+
+        // Only redraw the glyph when the alert state actually changes.
+        guard iconShowsAlert != alert else { return }
+        iconShowsAlert = alert
+        statusItem.button?.image = StatusBarIcon.image(alert: alert)
     }
 
     @objc private func togglePopover(_ sender: Any?) {

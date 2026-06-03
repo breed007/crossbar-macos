@@ -30,9 +30,16 @@ import SystemConfiguration
 final class StatusMonitor: ObservableObject {
     @Published private(set) var services: [NetworkServiceState] = []
 
-    private var store: SCDynamicStore!
+    private var store: SCDynamicStore?
     private var runLoopSource: CFRunLoopSource?
     private var refreshScheduled = false
+
+    /// Guards against overlapping background refreshes. A refresh requested
+    /// while one is already running sets `refreshPending` instead of spawning a
+    /// second `networksetup` process; the in-flight refresh re-runs when it sees
+    /// the flag. Touched only on the main thread.
+    private var refreshInFlight = false
+    private var refreshPending = false
 
     /// Supplies the connected Wi-Fi SSID (needs Location Services; see the type).
     private let wifiProvider = WiFiSSIDProvider()
@@ -125,11 +132,26 @@ final class StatusMonitor: ObservableObject {
     /// Two-phase refresh: fetch the user-facing service names off the main
     /// thread (the only subprocess), then assemble the model from
     /// SCPreferences + SCDynamicStore back on main and publish.
+    ///
+    /// Coalesces overlapping requests: if a refresh is already running, this
+    /// just marks one pending rather than launching a second concurrent
+    /// `networksetup`. Must be called on the main thread (all callers are).
     private func refresh() {
+        guard !refreshInFlight else {
+            refreshPending = true
+            return
+        }
+        refreshInFlight = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let visibleNames = self?.userFacingServiceNames()
             DispatchQueue.main.async {
-                self?.rebuildModel(visibleNames: visibleNames)
+                guard let self else { return }
+                self.rebuildModel(visibleNames: visibleNames)
+                self.refreshInFlight = false
+                if self.refreshPending {
+                    self.refreshPending = false
+                    self.refresh()
+                }
             }
         }
     }
@@ -250,15 +272,23 @@ final class StatusMonitor: ObservableObject {
 
     // MARK: - SCDynamicStore reads
 
-    /// The service ID currently owning the default IPv4 route — i.e. the one
-    /// actually carrying traffic when several services are connected at once.
+    /// The service ID currently owning the default route — i.e. the one actually
+    /// carrying traffic when several services are connected at once. Prefers the
+    /// IPv4 primary, falling back to IPv6 so the "active route" marker still
+    /// appears on IPv6-only networks (where Global/IPv4 has no PrimaryService).
     private func primaryServiceID() -> String? {
-        let key = "State:/Network/Global/IPv4" as CFString
-        guard let dict = SCDynamicStoreCopyValue(store, key) as? [String: Any] else { return nil }
-        return dict["PrimaryService"] as? String
+        guard let store else { return nil }
+        for key in ["State:/Network/Global/IPv4", "State:/Network/Global/IPv6"] {
+            if let dict = SCDynamicStoreCopyValue(store, key as CFString) as? [String: Any],
+               let primary = dict["PrimaryService"] as? String {
+                return primary
+            }
+        }
+        return nil
     }
 
     private func ipv4Info(serviceID: String) -> (address: String?, router: String?) {
+        guard let store else { return (nil, nil) }
         let key = "State:/Network/Service/\(serviceID)/IPv4" as CFString
         guard let dict = SCDynamicStoreCopyValue(store, key) as? [String: Any] else {
             return (nil, nil)
@@ -269,6 +299,7 @@ final class StatusMonitor: ObservableObject {
     }
 
     private func linkActive(bsd: String) -> Bool {
+        guard let store else { return false }
         let key = "State:/Network/Interface/\(bsd)/Link" as CFString
         guard let dict = SCDynamicStoreCopyValue(store, key) as? [String: Any] else { return false }
         return (dict["Active"] as? Bool) ?? false

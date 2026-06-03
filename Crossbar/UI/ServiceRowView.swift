@@ -9,9 +9,11 @@ import Cocoa
 /// settle the displayed state.
 final class ServiceRowView: NSView {
     private let toggleSwitch = NSSwitch()
-    private let onToggle: (Bool) -> Void
+    /// Reports the user's intent and passes `self` so the controller can freeze
+    /// this row's switch while the privileged call is in flight.
+    private let onToggle: (Bool, ServiceRowView) -> Void
 
-    init(state: NetworkServiceState, onToggle: @escaping (Bool) -> Void) {
+    init(state: NetworkServiceState, onToggle: @escaping (Bool, ServiceRowView) -> Void) {
         self.onToggle = onToggle
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
@@ -96,7 +98,7 @@ final class ServiceRowView: NSView {
     }
 
     @objc private func switchFlipped() {
-        onToggle(toggleSwitch.state == .on)
+        onToggle(toggleSwitch.state == .on, self)
     }
 
     /// A small filled circle colored by connectivity:

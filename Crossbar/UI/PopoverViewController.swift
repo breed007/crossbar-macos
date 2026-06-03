@@ -48,8 +48,10 @@ final class PopoverViewController: NSViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         rebuild(with: monitor.services)
-        // Live updates: every published snapshot rebuilds the list.
+        // Live updates: rebuild only when the snapshot actually changes, so an
+        // unrelated network blip doesn't tear down rows mid-hover.
         cancellable = monitor.$services
+            .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] in self?.rebuild(with: $0) }
     }
@@ -72,8 +74,8 @@ final class PopoverViewController: NSViewController {
             contentStack.addArrangedSubview(empty)
         } else {
             for service in services {
-                let row = ServiceRowView(state: service) { [weak self] desiredEnabled in
-                    self?.handleToggle(service: service, enable: desiredEnabled)
+                let row = ServiceRowView(state: service) { [weak self] desiredEnabled, row in
+                    self?.handleToggle(service: service, enable: desiredEnabled, row: row)
                 }
                 // A row whose toggle is mid-flight stays disabled until it lands.
                 row.setToggleEnabled(!inFlight.contains(service.name))
@@ -128,7 +130,7 @@ final class PopoverViewController: NSViewController {
         NSApp.terminate(nil)
     }
 
-    private func handleToggle(service: NetworkServiceState, enable: Bool) {
+    private func handleToggle(service: NetworkServiceState, enable: Bool, row: ServiceRowView) {
         // Security hygiene: only ever drive the privileged path with a name that
         // is present in the *current* live enumerated set. Rows are built from
         // that set, but we re-check in case the snapshot changed underneath us.
@@ -138,18 +140,22 @@ final class PopoverViewController: NSViewController {
         }
         guard !inFlight.contains(service.name) else { return }
         inFlight.insert(service.name)
+        // Freeze the just-clicked switch immediately so a rapid second click
+        // can't visually flip it back while the first call is still in flight.
+        row.setToggleEnabled(false)
 
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             defer {
-                inFlight.remove(service.name)
+                self.inFlight.remove(service.name)
                 // Resync the UI to the real state: confirms success, or reverts
                 // the optimistic switch position on failure.
-                monitor.refreshNow()
+                self.monitor.refreshNow()
             }
             do {
-                try await toggle.setEnabled(enable, serviceName: service.name)
+                try await self.toggle.setEnabled(enable, serviceName: service.name)
             } catch {
-                presentToggleError(error, serviceName: service.name)
+                self.presentToggleError(error, serviceName: service.name)
             }
         }
     }
