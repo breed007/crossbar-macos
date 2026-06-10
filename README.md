@@ -152,8 +152,11 @@ Built natively in Swift + AppKit. No third-party dependencies.
 
 crossbar deliberately does one thing well. It intentionally **does not** do
 network service priority reordering, location switching, proxy or VPN
-configuration, or bandwidth/speed/public-IP tooling. If you need those, the
-per-service **Network Settings…** link opens Apple's native pane.
+configuration, Bluetooth toggling, or bandwidth/speed/public-IP tooling. If you
+need those, the per-service **Network Settings…** link opens Apple's native pane.
+
+See [DESIGN.md](DESIGN.md) for the scope philosophy and the reasoning behind each
+non-goal (including why Bluetooth is deliberately left out).
 
 ## Contributing
 
