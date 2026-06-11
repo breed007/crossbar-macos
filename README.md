@@ -78,8 +78,8 @@ Then copy the built `Crossbar.app` to `/Applications`.
 ---
 
 crossbar runs as a menu bar **agent** — no Dock icon, no app-switcher entry.
-Look for the globe-with-crossbar glyph in your menu bar; click it to open the
-list. Quit from the popover's footer.
+Look for the crossbar glyph (three nodes on a diagonal) in your menu bar; click
+it to open the list. Quit from the popover's footer.
 
 ## One-time setup
 
