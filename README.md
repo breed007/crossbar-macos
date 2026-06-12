@@ -49,7 +49,15 @@ current state, and a switch. One click to flip it. That's the whole app.
 
 ## Install
 
-### Option 1 — Download the prebuilt app
+### Option 1 — Homebrew (recommended)
+
+```sh
+brew tap breed007/tap
+brew trust breed007/tap          # one-time — Homebrew requires trusting third-party taps
+brew install --cask crossbar
+```
+
+### Option 2 — Download the prebuilt app
 
 1. Download the latest `crossbar-vX.Y.Z-universal.zip` (or `.dmg`) from the
    [**Releases**](https://github.com/breed007/crossbar-macos/releases/latest) page.
@@ -59,7 +67,7 @@ current state, and a switch. One click to flip it. That's the whole app.
    without any Gatekeeper workaround. The binary is **universal** — runs natively on
    Apple Silicon and Intel.
 
-### Option 2 — Build from source
+### Option 3 — Build from source
 
 ```sh
 git clone https://github.com/breed007/crossbar-macos.git
