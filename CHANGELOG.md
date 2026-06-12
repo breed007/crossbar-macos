@@ -5,6 +5,16 @@ All notable changes to crossbar are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-06-12
+
+### Changed
+- **Signed and notarized with a Developer ID.** Builds are now Developer ID-signed
+  with the Hardened Runtime and notarized by Apple, so downloaded copies open
+  cleanly — the previous `xattr -dr com.apple.quarantine` step is no longer needed.
+- Added a reproducible release pipeline (`scripts/release.sh` +
+  `scripts/ExportOptions.plist`): archive → Developer ID export → notarize →
+  staple → package as a universal `.zip` and a `.dmg`.
+
 ## [0.2.1] — 2026-06-10
 
 ### Changed

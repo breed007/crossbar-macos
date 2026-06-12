@@ -51,18 +51,13 @@ current state, and a switch. One click to flip it. That's the whole app.
 
 ### Option 1 — Download the prebuilt app
 
-1. Download the latest `crossbar-vX.Y.Z-universal.zip` from the
+1. Download the latest `crossbar-vX.Y.Z-universal.zip` (or `.dmg`) from the
    [**Releases**](https://github.com/breed007/crossbar-macos/releases/latest) page.
-2. Unzip it and move **Crossbar.app** to `/Applications`.
-3. crossbar is **not notarized** (no paid Apple Developer ID), so macOS
-   quarantines downloaded copies. Clear the quarantine flag once:
-   ```sh
-   xattr -dr com.apple.quarantine /Applications/Crossbar.app
-   ```
-   (Or: try to open it, then click **Open Anyway** under System Settings →
-   Privacy & Security.)
-4. Launch it. The binary is **universal** — runs natively on Apple Silicon and
-   Intel.
+2. Unzip it and move **Crossbar.app** to `/Applications` (or drag it there from the
+   disk image).
+3. Launch it. crossbar is **signed and notarized** with a Developer ID, so it opens
+   without any Gatekeeper workaround. The binary is **universal** — runs natively on
+   Apple Silicon and Intel.
 
 ### Option 2 — Build from source
 
