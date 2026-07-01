@@ -75,10 +75,11 @@ final class ServiceRowView: NSView {
             heightAnchor.constraint(greaterThanOrEqualToConstant: 24),
         ])
 
-        // Hover detail (minimal, per spec): route state, IP, router (+ SSID).
-        var detail = "Route: \(state.routeState)\nIP: \(state.ipv4Address ?? "—")\nRouter: \(state.router ?? "—")"
+        // Hover detail (minimal, per spec): the full name (recoverable when the
+        // label truncates), then route state, IP, router (+ SSID).
+        var detail = "\(state.name)\nRoute: \(state.routeState)\nIP: \(state.ipv4Address ?? "—")\nRouter: \(state.router ?? "—")"
         if let ssid = state.ssid {
-            detail = "Network: \(ssid)\n" + detail
+            detail += "\nNetwork: \(ssid)"
         }
         toolTip = detail
 
@@ -87,6 +88,29 @@ final class ServiceRowView: NSView {
         // services (the active route and any connected NIC) stand out. A dimmed
         // row is still fully interactive, so the switch remains usable.
         alphaValue = (state.connectivity == .connected) ? 1.0 : 0.5
+
+        // Accessibility: status is conveyed by dot color alone, which fails
+        // color-blind users and VoiceOver. Give the row a spoken label carrying
+        // the full state, and label the switch so it isn't an anonymous control.
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel(Self.accessibilityLabel(for: state))
+        toggleSwitch.setAccessibilityLabel("\(state.name), \(state.isEnabled ? "on" : "off")")
+    }
+
+    /// A spoken description of a row's full state, e.g.
+    /// "Wi-Fi, connected, active route, enabled".
+    private static func accessibilityLabel(for state: NetworkServiceState) -> String {
+        let status: String
+        switch state.connectivity {
+        case .connected:    status = "connected"
+        case .notConnected: status = "enabled but not connected"
+        case .inactive:     status = "disabled"
+        }
+        var parts = [state.name, status]
+        if state.isPrimary { parts.append("active route") }
+        if let ssid = state.ssid { parts.append("network \(ssid)") }
+        return parts.joined(separator: ", ")
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -97,26 +121,38 @@ final class ServiceRowView: NSView {
         toggleSwitch.isEnabled = enabled
     }
 
+    /// Force the switch to a known position — used to revert an optimistic flip
+    /// when a toggle fails (where no model change occurs, so no rebuild lands).
+    func setToggleOn(_ isOn: Bool) {
+        toggleSwitch.state = isOn ? .on : .off
+    }
+
     @objc private func switchFlipped() {
         onToggle(toggleSwitch.state == .on, self)
     }
 
-    /// A small filled circle colored by connectivity:
-    /// green = connected, yellow = enabled but down, gray = inactive.
+    /// A small status glyph. Color AND shape both encode connectivity, so it
+    /// stays distinguishable for color-blind users (who can't rely on the
+    /// green/yellow difference alone):
+    ///   connected → filled circle (green)
+    ///   enabled but down → hollow circle (yellow)
+    ///   disabled → circle with a slash (gray)
     private static func makeDot(for connectivity: NetworkServiceState.Connectivity) -> NSView {
         let color: NSColor
+        let symbol: String
         switch connectivity {
-        case .connected:    color = .systemGreen
-        case .notConnected: color = .systemYellow
-        case .inactive:     color = .tertiaryLabelColor
+        case .connected:    color = .systemGreen;         symbol = "circle.fill"
+        case .notConnected: color = .systemYellow;        symbol = "circle"
+        case .inactive:     color = .tertiaryLabelColor;  symbol = "circle.slash"
         }
 
-        let image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: nil)
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         let config = NSImage.SymbolConfiguration(pointSize: 9, weight: .regular)
         let dot = NSImageView(image: image?.withSymbolConfiguration(config) ?? NSImage())
         dot.contentTintColor = color
         dot.translatesAutoresizingMaskIntoConstraints = false
         dot.setContentHuggingPriority(.required, for: .horizontal)
+        dot.setAccessibilityElement(false)   // status is spoken via the row label
         return dot
     }
 }

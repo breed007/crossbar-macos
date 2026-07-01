@@ -5,6 +5,32 @@ All notable changes to crossbar are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-06-13
+
+### Fixed
+- **A failed toggle no longer leaves the switch stuck.** When a toggle failed
+  (most commonly on first run before the sudoers rule is installed), the switch
+  stayed greyed-out and showing the wrong position, and reopening the popover
+  didn't recover it — the no-op refresh was deduplicated away, so no rebuild
+  ever re-enabled the row. The row is now reverted and re-enabled directly on
+  failure.
+- **Long service names are now recoverable** — the hover tooltip includes the
+  full service name, so names that truncate in the row can still be read.
+- Hardened the `networksetup` name parser against a service whose name legiti-
+  mately begins with `*` (the disabled-marker character).
+
+### Changed
+- **Location Services prompt is deferred to first popover open** instead of
+  firing unprompted at launch, so the ask (for the Wi-Fi SSID) has visible
+  context.
+
+### Accessibility
+- **Status is no longer conveyed by color alone.** The status dot now varies by
+  shape too — filled circle (connected), hollow circle (enabled but down),
+  slashed circle (disabled) — so it stays legible for color-blind users.
+- Each service row now carries a VoiceOver label describing its full state
+  (name, connectivity, active-route, SSID), and the toggle is labeled.
+
 ## [0.3.0] — 2026-06-12
 
 ### Changed
@@ -68,6 +94,8 @@ First release.
 - **Application icon** (globe + crossbar) for Finder and Get Info.
 - **Universal** build (Apple Silicon + Intel).
 
+[0.4.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.4.0
+[0.3.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.3.0
 [0.2.1]: https://github.com/breed007/crossbar-macos/releases/tag/v0.2.1
 [0.2.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.2.0
 [0.1.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.1.0

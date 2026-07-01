@@ -65,6 +65,13 @@ final class StatusMonitor: ObservableObject {
         refresh()
     }
 
+    /// Ask for Wi-Fi SSID access (Location Services) if not yet decided. Called
+    /// when the user first opens the popover, so the prompt has context rather
+    /// than firing unprompted at launch.
+    func requestWiFiAccessIfNeeded() {
+        wifiProvider.requestAccessIfNeeded()
+    }
+
     // MARK: - SCDynamicStore setup
 
     private func makeDynamicStore() -> SCDynamicStore? {
@@ -176,11 +183,17 @@ final class StatusMonitor: ObservableObject {
 
         // First line is the "An asterisk (*) denotes..." legend; a leading "*"
         // on a service line marks it disabled (state we read from SC anyway).
+        // We insert BOTH the raw line and the asterisk-stripped form: stripping
+        // is right for the common "*Disabled Service" case, but a service whose
+        // real name legitimately starts with "*" would be corrupted by blindly
+        // stripping — keeping the raw form too means it still matches its SC name.
         var names = Set<String>()
         for line in output.split(separator: "\n").dropFirst() {
-            var name = String(line)
-            if name.hasPrefix("*") { name.removeFirst() }
-            names.insert(name.trimmingCharacters(in: .whitespaces))
+            let raw = String(line).trimmingCharacters(in: .whitespaces)
+            names.insert(raw)
+            if raw.hasPrefix("*") {
+                names.insert(String(raw.dropFirst()).trimmingCharacters(in: .whitespaces))
+            }
         }
         return names
     }

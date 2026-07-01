@@ -34,7 +34,7 @@ final class StatusItemController {
         popover.contentViewController = PopoverViewController(monitor: monitor, toggle: privilegedToggle)
 
         if let button = statusItem.button {
-            // Custom globe-with-crossbar template glyph (see StatusBarIcon).
+            // Custom nodes-on-a-crossbar template glyph (see StatusBarIcon).
             button.image = StatusBarIcon.image()
             button.action = #selector(togglePopover(_:))
             button.target = self
@@ -72,6 +72,9 @@ final class StatusItemController {
         if popover.isShown {
             popover.performClose(sender)
         } else {
+            // First open is a natural, in-context moment to ask for Wi-Fi SSID
+            // access (no-op after the first time / once decided).
+            monitor.requestWiFiAccessIfNeeded()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             // Bring the popover's window forward so it can take key focus even
             // though we're an accessory (non-activating) app.

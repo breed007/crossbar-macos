@@ -146,14 +146,27 @@ final class PopoverViewController: NSViewController {
 
         Task { @MainActor [weak self] in
             guard let self else { return }
+            var succeeded = false
             defer {
                 self.inFlight.remove(service.name)
-                // Resync the UI to the real state: confirms success, or reverts
-                // the optimistic switch position on failure.
-                self.monitor.refreshNow()
+                if succeeded {
+                    // The system state changed, so refreshNow() publishes a
+                    // *different* snapshot → rebuild() replaces this row with a
+                    // fresh, correctly-positioned one. Nothing to do to the row.
+                    self.monitor.refreshNow()
+                } else {
+                    // FAILURE: the model is unchanged, so refreshNow() would
+                    // publish an equal snapshot that removeDuplicates() drops —
+                    // no rebuild lands, and the row we froze above would stay
+                    // stuck showing the wrong position. So revert and re-enable
+                    // this row directly, to its true (unchanged) state.
+                    row.setToggleOn(service.isEnabled)
+                    row.setToggleEnabled(true)
+                }
             }
             do {
                 try await self.toggle.setEnabled(enable, serviceName: service.name)
+                succeeded = true
             } catch {
                 self.presentToggleError(error, serviceName: service.name)
             }

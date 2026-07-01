@@ -23,6 +23,14 @@ final class WiFiSSIDProvider: NSObject, CLLocationManagerDelegate {
     override init() {
         super.init()
         locationManager.delegate = self
+    }
+
+    /// Request location authorization if it hasn't been decided yet. Deliberately
+    /// NOT called from `init`: firing the system location prompt the instant the
+    /// app launches — before the user has opened anything — reads as suspicious
+    /// for a network-toggle utility. The UI calls this the first time the user
+    /// opens the popover, so the ask has visible context (a Wi-Fi row present).
+    func requestAccessIfNeeded() {
         if locationManager.authorizationStatus == .notDetermined {
             locationManager.requestWhenInUseAuthorization()   // one-time system prompt
         }

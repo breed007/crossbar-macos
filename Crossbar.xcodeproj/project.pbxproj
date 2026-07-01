@@ -276,7 +276,7 @@
 				INFOPLIST_KEY_NSLocationUsageDescription = "Crossbar uses your location only to read the name (SSID) of the Wi-Fi network you’re connected to. macOS withholds the SSID from apps without this permission.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Crossbar uses your location only to read the name (SSID) of the Wi-Fi network you’re connected to. macOS withholds the SSID from apps without this permission.";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.breed.Crossbar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -299,7 +299,7 @@
 				INFOPLIST_KEY_NSLocationUsageDescription = "Crossbar uses your location only to read the name (SSID) of the Wi-Fi network you’re connected to. macOS withholds the SSID from apps without this permission.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Crossbar uses your location only to read the name (SSID) of the Wi-Fi network you’re connected to. macOS withholds the SSID from apps without this permission.";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.breed.Crossbar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
