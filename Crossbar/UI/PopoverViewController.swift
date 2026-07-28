@@ -84,13 +84,20 @@ final class PopoverViewController: NSViewController {
             }
         }
 
-        // Footer: a separator, then a deep link to the native Network settings
-        // (for the full data we deliberately omit) and a Quit action.
+        // Footer: a separator, a "Launch at Login" checkbox, then a deep link to
+        // the native Network settings (for the full data we deliberately omit)
+        // and a Quit action.
         let separator = NSBox()
         separator.boxType = .separator
         separator.translatesAutoresizingMaskIntoConstraints = false
         contentStack.addArrangedSubview(separator)
         separator.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+
+        let launchToggle = NSButton(checkboxWithTitle: "Launch at Login",
+                                    target: self, action: #selector(toggleLaunchAtLogin(_:)))
+        launchToggle.font = .systemFont(ofSize: 11)
+        launchToggle.state = LoginItem.isEnabled ? .on : .off
+        contentStack.addArrangedSubview(launchToggle)
 
         let settingsButton = makeFooterButton(title: "Network Settings…",
                                               action: #selector(openNetworkSettings))
@@ -128,6 +135,44 @@ final class PopoverViewController: NSViewController {
 
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+
+    @objc private func toggleLaunchAtLogin(_ sender: NSButton) {
+        let wantOn = sender.state == .on
+        do {
+            try LoginItem.setEnabled(wantOn)
+            // If macOS parked the request pending user approval, the login item
+            // isn't actually on yet — reflect that and point the user at Settings.
+            if wantOn && LoginItem.requiresApproval {
+                sender.state = .off
+                presentLoginApprovalNeeded()
+            }
+        } catch {
+            // Revert the checkbox to the true state and surface why.
+            sender.state = LoginItem.isEnabled ? .on : .off
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Couldn’t change “Launch at Login”"
+            alert.informativeText = error.localizedDescription
+            alert.addButton(withTitle: "OK")
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
+    }
+
+    private func presentLoginApprovalNeeded() {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Approval needed"
+        alert.informativeText = "Turn on Crossbar under System Settings → General → "
+            + "Login Items & Extensions to have it launch at login."
+        alert.addButton(withTitle: "Open Login Items")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn,
+           let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func handleToggle(service: NetworkServiceState, enable: Bool, row: ServiceRowView) {
