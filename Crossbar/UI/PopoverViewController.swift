@@ -210,7 +210,7 @@ final class PopoverViewController: NSViewController {
                 }
             }
             do {
-                try await self.toggle.setEnabled(enable, serviceName: service.name)
+                try await self.toggle.setEnabled(enable, serviceID: service.id, serviceName: service.name)
                 succeeded = true
             } catch {
                 self.presentToggleError(error, serviceName: service.name)

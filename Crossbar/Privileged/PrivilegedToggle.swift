@@ -7,10 +7,13 @@ import Foundation
 protocol PrivilegedToggle {
     /// Enable or disable a network service.
     ///
-    /// - Important: `serviceName` MUST be a name that came from the live
-    ///   enumerated service set (`SCNetworkServiceGetName`). Never pass a
-    ///   user-typed or otherwise unvalidated string into this privileged path.
-    func setEnabled(_ enabled: Bool, serviceName: String) async throws
+    /// Both identifiers come from the live enumerated set (`NetworkServiceState`):
+    /// - `serviceID` is the stable `SCNetworkService` ID — the authoritative
+    ///   target used by the XPC backend (unambiguous even with duplicate names).
+    /// - `serviceName` is the display name — used by the `networksetup` backend,
+    ///   which only accepts names. MUST be a name from `SCNetworkServiceGetName`;
+    ///   never a user-typed or otherwise unvalidated string.
+    func setEnabled(_ enabled: Bool, serviceID: String, serviceName: String) async throws
 }
 
 /// Failures surfaced from the privileged path, with user-facing descriptions.
@@ -22,6 +25,12 @@ enum PrivilegedToggleError: LocalizedError {
     case commandFailed(status: Int32, message: String)
     /// The process couldn't be launched at all.
     case launchFailed(String)
+    /// The privileged helper isn't installed/approved yet.
+    case helperNotInstalled
+    /// The XPC call to the helper failed (connection or protocol error).
+    case helperCommunicationFailed(String)
+    /// The helper ran but reported a failure performing the change.
+    case helperReportedError(String)
 
     var errorDescription: String? {
         switch self {
@@ -32,6 +41,12 @@ enum PrivilegedToggleError: LocalizedError {
             return "networksetup failed (exit code \(status)).\(detail)"
         case .launchFailed(let message):
             return "Couldn’t run networksetup: \(message)"
+        case .helperNotInstalled:
+            return "Crossbar’s privileged helper isn’t installed yet."
+        case .helperCommunicationFailed(let message):
+            return "Couldn’t reach Crossbar’s helper: \(message)"
+        case .helperReportedError(let message):
+            return "The helper couldn’t change the service: \(message)"
         }
     }
 }
