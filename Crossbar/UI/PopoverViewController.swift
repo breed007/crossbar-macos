@@ -7,6 +7,9 @@ import Combine
 final class PopoverViewController: NSViewController {
     private let monitor: StatusMonitor
     private let toggle: PrivilegedToggle
+    /// Non-nil when the toggle is a router that can install the privileged helper
+    /// — used to offer the "Set up helper" affordance and reflect its status.
+    private var router: ToggleRouter? { toggle as? ToggleRouter }
     private var cancellable: AnyCancellable?
 
     /// Service names with a toggle currently in flight, so a second flip on the
@@ -99,6 +102,23 @@ final class PopoverViewController: NSViewController {
         launchToggle.state = LoginItem.isEnabled ? .on : .off
         contentStack.addArrangedSubview(launchToggle)
 
+        // Helper status / setup. When the privileged helper (Backend B) isn't
+        // installed, offer to set it up (removes the need for the sudoers rule).
+        // When it's active, show a subtle confirmation instead.
+        if let router {
+            if router.usingHelper {
+                let active = NSTextField(labelWithString: "✓ Passwordless toggling active")
+                active.font = .systemFont(ofSize: 11)
+                active.textColor = .secondaryLabelColor
+                contentStack.addArrangedSubview(active)
+            } else {
+                let setup = makeFooterButton(title: "Set up passwordless toggling…",
+                                             action: #selector(setUpHelper))
+                setup.contentTintColor = .controlAccentColor
+                contentStack.addArrangedSubview(setup)
+            }
+        }
+
         let settingsButton = makeFooterButton(title: "Network Settings…",
                                               action: #selector(openNetworkSettings))
         let quitButton = makeFooterButton(title: "Quit", action: #selector(quit))
@@ -153,6 +173,44 @@ final class PopoverViewController: NSViewController {
             let alert = NSAlert()
             alert.alertStyle = .warning
             alert.messageText = "Couldn’t change “Launch at Login”"
+            alert.informativeText = error.localizedDescription
+            alert.addButton(withTitle: "OK")
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
+    }
+
+    @objc private func setUpHelper() {
+        guard let router else { return }
+        do {
+            try router.helper.install()
+            let alert = NSAlert()
+            alert.alertStyle = .informational
+            if router.helper.requiresApproval {
+                alert.messageText = "One more step"
+                alert.informativeText = "Enable Crossbar’s background item under System "
+                    + "Settings → General → Login Items & Extensions to finish setting up "
+                    + "passwordless toggling."
+                alert.addButton(withTitle: "Open Settings")
+                alert.addButton(withTitle: "Later")
+                NSApp.activate(ignoringOtherApps: true)
+                if alert.runModal() == .alertFirstButtonReturn,
+                   let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
+                    NSWorkspace.shared.open(url)
+                }
+            } else {
+                alert.messageText = "Passwordless toggling is set up"
+                alert.informativeText = "Crossbar can now enable and disable network "
+                    + "services without the sudo rule."
+                alert.addButton(withTitle: "OK")
+                NSApp.activate(ignoringOtherApps: true)
+                alert.runModal()
+            }
+            monitor.refreshNow()   // refresh footer to reflect new status
+        } catch {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Couldn’t set up the helper"
             alert.informativeText = error.localizedDescription
             alert.addButton(withTitle: "OK")
             NSApp.activate(ignoringOtherApps: true)

@@ -16,9 +16,10 @@ final class StatusItemController {
     /// closed (the menu bar icon will reflect its state in M3).
     private let monitor = StatusMonitor()
 
-    /// The privileged write path, behind a protocol so the backend can change
-    /// without touching the UI.
-    private let privilegedToggle: PrivilegedToggle = NetworksetupToggle()
+    /// The privileged write path. `ToggleRouter` picks Backend B (the helper) when
+    /// installed and falls back to Backend A (networksetup) otherwise — behind the
+    /// `PrivilegedToggle` protocol so the UI never knows which ran.
+    private let toggleRouter = ToggleRouter()
 
     private var cancellable: AnyCancellable?
 
@@ -31,7 +32,7 @@ final class StatusItemController {
 
         popover = NSPopover()
         popover.behavior = .transient   // closes itself when focus moves elsewhere
-        popover.contentViewController = PopoverViewController(monitor: monitor, toggle: privilegedToggle)
+        popover.contentViewController = PopoverViewController(monitor: monitor, toggle: toggleRouter)
 
         if let button = statusItem.button {
             // Custom nodes-on-a-crossbar template glyph (see StatusBarIcon).
