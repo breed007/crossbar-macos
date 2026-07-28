@@ -19,7 +19,9 @@ final class NetworksetupToggle: PrivilegedToggle {
     /// Serial queue → at most one networksetup process at a time.
     private let queue = DispatchQueue(label: "com.breed.Crossbar.PrivilegedToggle")
 
-    func setEnabled(_ enabled: Bool, serviceName: String) async throws {
+    /// Backend A toggles by display name (all `networksetup` accepts); the
+    /// stable `serviceID` is unused here.
+    func setEnabled(_ enabled: Bool, serviceID: String, serviceName: String) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             queue.async {
                 do {

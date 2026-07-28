@@ -5,6 +5,29 @@ All notable changes to crossbar are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-07-27
+
+### Added
+- **Passwordless toggling via a privileged helper (no more sudoers rule).**
+  Crossbar can now install a signed background helper (`SMAppService`) that
+  performs the enable/disable directly, over an authenticated XPC connection.
+  Set it up from the popover footer → "Set up passwordless toggling…" and
+  approve it under System Settings → Login Items & Extensions. This replaces the
+  manual `/etc/sudoers.d/crossbar` step for anyone who opts in.
+  - The helper pins its caller to Crossbar's own code signature (Team ID), and
+    re-validates the target service **ID** against live config before writing —
+    so a service name can never be spoofed into a privileged change, and
+    duplicate service names are unambiguous.
+  - The `networksetup`/sudoers path (Backend A) remains as an automatic fallback
+    for anyone who doesn't install the helper, or on managed Macs.
+- **Launch at Login** — a checkbox in the popover footer registers Crossbar to
+  start automatically (`SMAppService`).
+
+### Design
+
+- Added [Backend B design doc](docs/backend-b-design.md) documenting the helper
+  architecture, the XPC contract, and the signature-pinning security model.
+
 ## [0.4.0] — 2026-06-13
 
 ### Fixed
@@ -94,6 +117,7 @@ First release.
 - **Application icon** (globe + crossbar) for Finder and Get Info.
 - **Universal** build (Apple Silicon + Intel).
 
+[0.5.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.5.0
 [0.4.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.4.0
 [0.3.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.3.0
 [0.2.1]: https://github.com/breed007/crossbar-macos/releases/tag/v0.2.1

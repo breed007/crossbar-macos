@@ -7,6 +7,9 @@ import Combine
 final class PopoverViewController: NSViewController {
     private let monitor: StatusMonitor
     private let toggle: PrivilegedToggle
+    /// Non-nil when the toggle is a router that can install the privileged helper
+    /// — used to offer the "Set up helper" affordance and reflect its status.
+    private var router: ToggleRouter? { toggle as? ToggleRouter }
     private var cancellable: AnyCancellable?
 
     /// Service names with a toggle currently in flight, so a second flip on the
@@ -84,13 +87,37 @@ final class PopoverViewController: NSViewController {
             }
         }
 
-        // Footer: a separator, then a deep link to the native Network settings
-        // (for the full data we deliberately omit) and a Quit action.
+        // Footer: a separator, a "Launch at Login" checkbox, then a deep link to
+        // the native Network settings (for the full data we deliberately omit)
+        // and a Quit action.
         let separator = NSBox()
         separator.boxType = .separator
         separator.translatesAutoresizingMaskIntoConstraints = false
         contentStack.addArrangedSubview(separator)
         separator.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+
+        let launchToggle = NSButton(checkboxWithTitle: "Launch at Login",
+                                    target: self, action: #selector(toggleLaunchAtLogin(_:)))
+        launchToggle.font = .systemFont(ofSize: 11)
+        launchToggle.state = LoginItem.isEnabled ? .on : .off
+        contentStack.addArrangedSubview(launchToggle)
+
+        // Helper status / setup. When the privileged helper (Backend B) isn't
+        // installed, offer to set it up (removes the need for the sudoers rule).
+        // When it's active, show a subtle confirmation instead.
+        if let router {
+            if router.usingHelper {
+                let active = NSTextField(labelWithString: "✓ Passwordless toggling active")
+                active.font = .systemFont(ofSize: 11)
+                active.textColor = .secondaryLabelColor
+                contentStack.addArrangedSubview(active)
+            } else {
+                let setup = makeFooterButton(title: "Set up passwordless toggling…",
+                                             action: #selector(setUpHelper))
+                setup.contentTintColor = .controlAccentColor
+                contentStack.addArrangedSubview(setup)
+            }
+        }
 
         let settingsButton = makeFooterButton(title: "Network Settings…",
                                               action: #selector(openNetworkSettings))
@@ -130,6 +157,82 @@ final class PopoverViewController: NSViewController {
         NSApp.terminate(nil)
     }
 
+    @objc private func toggleLaunchAtLogin(_ sender: NSButton) {
+        let wantOn = sender.state == .on
+        do {
+            try LoginItem.setEnabled(wantOn)
+            // If macOS parked the request pending user approval, the login item
+            // isn't actually on yet — reflect that and point the user at Settings.
+            if wantOn && LoginItem.requiresApproval {
+                sender.state = .off
+                presentLoginApprovalNeeded()
+            }
+        } catch {
+            // Revert the checkbox to the true state and surface why.
+            sender.state = LoginItem.isEnabled ? .on : .off
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Couldn’t change “Launch at Login”"
+            alert.informativeText = error.localizedDescription
+            alert.addButton(withTitle: "OK")
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
+    }
+
+    @objc private func setUpHelper() {
+        guard let router else { return }
+        do {
+            try router.helper.install()
+            let alert = NSAlert()
+            alert.alertStyle = .informational
+            if router.helper.requiresApproval {
+                alert.messageText = "One more step"
+                alert.informativeText = "Enable Crossbar’s background item under System "
+                    + "Settings → General → Login Items & Extensions to finish setting up "
+                    + "passwordless toggling."
+                alert.addButton(withTitle: "Open Settings")
+                alert.addButton(withTitle: "Later")
+                NSApp.activate(ignoringOtherApps: true)
+                if alert.runModal() == .alertFirstButtonReturn,
+                   let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
+                    NSWorkspace.shared.open(url)
+                }
+            } else {
+                alert.messageText = "Passwordless toggling is set up"
+                alert.informativeText = "Crossbar can now enable and disable network "
+                    + "services without the sudo rule."
+                alert.addButton(withTitle: "OK")
+                NSApp.activate(ignoringOtherApps: true)
+                alert.runModal()
+            }
+            monitor.refreshNow()   // refresh footer to reflect new status
+        } catch {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Couldn’t set up the helper"
+            alert.informativeText = error.localizedDescription
+            alert.addButton(withTitle: "OK")
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
+    }
+
+    private func presentLoginApprovalNeeded() {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Approval needed"
+        alert.informativeText = "Turn on Crossbar under System Settings → General → "
+            + "Login Items & Extensions to have it launch at login."
+        alert.addButton(withTitle: "Open Login Items")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn,
+           let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     private func handleToggle(service: NetworkServiceState, enable: Bool, row: ServiceRowView) {
         // Security hygiene: only ever drive the privileged path with a name that
         // is present in the *current* live enumerated set. Rows are built from
@@ -165,7 +268,7 @@ final class PopoverViewController: NSViewController {
                 }
             }
             do {
-                try await self.toggle.setEnabled(enable, serviceName: service.name)
+                try await self.toggle.setEnabled(enable, serviceID: service.id, serviceName: service.name)
                 succeeded = true
             } catch {
                 self.presentToggleError(error, serviceName: service.name)
