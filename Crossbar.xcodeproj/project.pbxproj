@@ -417,9 +417,10 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleIdentifier = com.breed.Crossbar.helper;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Helper/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.breed.Crossbar.helper;
 				PRODUCT_NAME = CrossbarHelper;
@@ -434,9 +435,10 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleIdentifier = com.breed.Crossbar.helper;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Helper/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.breed.Crossbar.helper;
 				PRODUCT_NAME = CrossbarHelper;
