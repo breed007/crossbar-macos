@@ -373,7 +373,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Crossbar;
@@ -381,7 +381,7 @@
 				INFOPLIST_KEY_NSLocationUsageDescription = "Crossbar uses your location only to read the name (SSID) of the Wi-Fi network you’re connected to. macOS withholds the SSID from apps without this permission.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Crossbar uses your location only to read the name (SSID) of the Wi-Fi network you’re connected to. macOS withholds the SSID from apps without this permission.";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
-				MARKETING_VERSION = 0.4.0;
+				MARKETING_VERSION = 0.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.breed.Crossbar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -396,7 +396,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Crossbar;
@@ -404,7 +404,7 @@
 				INFOPLIST_KEY_NSLocationUsageDescription = "Crossbar uses your location only to read the name (SSID) of the Wi-Fi network you’re connected to. macOS withholds the SSID from apps without this permission.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Crossbar uses your location only to read the name (SSID) of the Wi-Fi network you’re connected to. macOS withholds the SSID from apps without this permission.";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
-				MARKETING_VERSION = 0.4.0;
+				MARKETING_VERSION = 0.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.breed.Crossbar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
