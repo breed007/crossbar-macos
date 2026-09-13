@@ -22,3 +22,6 @@ xcuserdata/
 
 # Misc
 *.log
+
+# Claude Code (machine-local)
+.claude/settings.local.json
