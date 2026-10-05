@@ -6,11 +6,14 @@ import ServiceManagement
 /// path before the same framework is trusted with the privileged helper.
 enum LoginItem {
     /// Whether Crossbar is currently set to launch at login.
-    static var isEnabled: Bool {
-        SMAppService.mainApp.status == .enabled
-    }
+    static var isEnabled: Bool { status == .enabled }
 
-    static var status: HelperStatus { HelperStatus(SMAppService.mainApp.status) }
+    static var status: HelperStatus {
+        #if DEBUG
+        if DemoData.active { return .enabled }
+        #endif
+        return HelperStatus(SMAppService.mainApp.status)
+    }
 
     /// Turn launch-at-login on or off. Throws if the system rejects the change
     /// (e.g. the user must approve it in Login Items & Extensions).
@@ -28,7 +31,5 @@ enum LoginItem {
 
     /// True when the change requires the user to approve Crossbar under
     /// System Settings → General → Login Items & Extensions.
-    static var requiresApproval: Bool {
-        SMAppService.mainApp.status == .requiresApproval
-    }
+    static var requiresApproval: Bool { status == .requiresApproval }
 }

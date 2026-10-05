@@ -142,3 +142,53 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         }
     }
 }
+
+#if DEBUG
+extension StatusItemController {
+    private static var demoBackdrop: NSWindow?
+
+    /// Open one piece of UI with sample data for a screenshot (debug flag `--demo`):
+    /// `popover`, `warning` (the route warning), or `settings`.
+    func debugDemo(_ what: String) {
+        // A backdrop in GitHub's page color, above everything else on screen (menu bar
+        // included) and just below the captured UI. The script captures the composited
+        // screen region, so the popover's material blends with this, as it would with
+        // a desktop, instead of with the real screen, and the image blends into the
+        // README.
+        let dark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let backdrop = NSWindow(contentRect: NSScreen.main?.frame ?? .zero, styleMask: .borderless,
+                                backing: .buffered, defer: false)
+        backdrop.title = "CrossbarDemoBackdrop"   // the capture script skips it by name
+        backdrop.backgroundColor = DemoData.backdropColor(dark: dark)
+        // NSAlert sets its window to the modal-panel level when it runs, and main-queue
+        // work doesn't run inside its modal loop, so for the warning the backdrop goes
+        // below that level from the start.
+        let below = what == "warning" ? NSWindow.Level.modalPanel : NSWindow.Level.popUpMenu
+        backdrop.level = NSWindow.Level(rawValue: below.rawValue - 1)
+        backdrop.ignoresMouseEvents = true
+        backdrop.orderFrontRegardless()
+        Self.demoBackdrop = backdrop
+
+        switch what {
+        case "warning":
+            // Turning off the active route when Wi-Fi can take over.
+            let prediction = RoutePrediction.disabling("demo-ethernet", in: DemoData.services)
+            let plan = ToggleConfirmation.plan(serviceName: "Ethernet", prediction: prediction,
+                                               remoteSessions: [], confirmHandoff: true)
+            MainActor.assumeIsolated { _ = plan?.confirm() }   // debugDemo runs on the main queue
+        case "settings":
+            SettingsWindowController.shared.show()
+            SettingsWindowController.shared.window?.level = DemoData.uiLevel
+        default:
+            // A popover anchored to the menu bar takes the menu bar's appearance (the
+            // system's), not the app's; force the requested one for the screenshot.
+            popover.appearance = NSApp.appearance
+            statusItem.button?.performClick(nil)   // opens the popover
+            if let window = popover.contentViewController?.view.window {
+                if window.level.rawValue <= backdrop.level.rawValue { window.level = DemoData.uiLevel }
+                FileHandle.standardError.write(Data("popover level \(window.level.rawValue), backdrop \(backdrop.level.rawValue)\n".utf8))
+            }
+        }
+    }
+}
+#endif

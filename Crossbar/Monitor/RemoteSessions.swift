@@ -20,7 +20,10 @@ struct RemoteSession: Equatable {
 enum RemoteSessions {
     /// The remote sessions active right now.
     static func current() -> [RemoteSession] {
-        summarize(loginHosts: loginHosts(), processNames: processNames())
+        #if DEBUG
+        if DemoData.active { return [] }
+        #endif
+        return summarize(loginHosts: loginHosts(), processNames: processNames())
     }
 
     /// Pure: login records with a non-empty host are remote logins (local console

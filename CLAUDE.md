@@ -17,6 +17,10 @@ non-goals), and `docs/backend-b-design.md` before touching the helper.
   so helper work has to be tested this way.
 - `scripts/release.sh` archives, notarizes, staples, and packages the `.zip` and
   `.dmg` into `dist/`.
+- `scripts/screenshots.sh` regenerates the README images in `docs/screenshots/`
+  (light and dark of the popover, route warning, and Settings). It builds its own
+  ad-hoc Debug app into `build/screens` and installs nothing. View every image
+  before committing.
 
 ## Architecture
 
@@ -50,6 +54,15 @@ non-goals), and `docs/backend-b-design.md` before touching the helper.
 - The keychain lists each Developer ID identity twice, so `codesign -s "Developer ID
   Application"` is ambiguous outside Xcode. Sign by SHA-1 hash, and check the
   result with `codesign -dvvv`; a failed re-sign leaves the old signature in place.
+- Screenshots: `--demo popover|warning|settings light|dark` sets `DemoData.active`,
+  which swaps in sample services and a throwaway defaults suite and reports the
+  helper and login item as enabled. Never put this Mac's SSID, IPs, or VPN names
+  in an image. The script captures the screen region (`screencapture -R`) over a
+  full-screen backdrop window in GitHub's page colors; `screencapture -l` flattens
+  the popover material. A popover anchored to the menu bar takes the system's
+  appearance, not the app's, so demo mode sets `popover.appearance` explicitly. The
+  NSAlert's backdrop sits just below `.modalPanel`, everything else just below
+  `.popUpMenu`. Bounds are re-read after the popover finishes animating open.
 - The App Intents file is excluded from the test bundle, or the test process
   registers App Shortcuts with the system (learned in Switchback).
 

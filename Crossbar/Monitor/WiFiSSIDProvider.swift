@@ -31,6 +31,9 @@ final class WiFiSSIDProvider: NSObject, CLLocationManagerDelegate {
     /// for a network-toggle utility. The UI calls this the first time the user
     /// opens the popover, so the ask has visible context (a Wi-Fi row present).
     func requestAccessIfNeeded() {
+        #if DEBUG
+        if DemoData.active { return }   // demo services carry their own sample SSID
+        #endif
         if locationManager.authorizationStatus == .notDetermined {
             locationManager.requestWhenInUseAuthorization()   // one-time system prompt
         }

@@ -17,6 +17,9 @@ struct Preferences {
     let defaults: UserDefaults
 
     init(_ defaults: UserDefaults = .standard) {
+        #if DEBUG
+        let defaults = DemoData.active ? DemoData.defaults : defaults
+        #endif
         self.defaults = defaults
         defaults.register(defaults: [Self.showNetworkNameKey: false,
                                      Self.confirmRouteHandoffKey: true])

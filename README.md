@@ -7,8 +7,12 @@
 ![Language](https://img.shields.io/badge/Swift-AppKit-orange)
 
 <p align="center">
-  <img src="docs/popover.png" alt="crossbar popover showing network services" width="420">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/popover-dark.png">
+    <img src="docs/screenshots/popover-light.png" alt="crossbar popover listing Ethernet as the active route, Wi-Fi, a VPN, and a Thunderbolt Bridge that is off" width="370">
+  </picture>
 </p>
+<p align="center"><sub>Screenshots use sample data. <code>scripts/screenshots.sh</code> regenerates them.</sub></p>
 
 ## Why crossbar?
 
@@ -32,7 +36,7 @@ state, and a switch.
   service carrying your traffic. Dormant services are dimmed. When traffic moves to
   another service, its label fades in there.
 - Warns before it surprises you. Turning off the service carrying your traffic
-  first says what happens: "Traffic will move to Wi-Fi (MI6)", or "you'll go
+  first says what happens: "Traffic will move to Wi-Fi (Harbor Lane)", or "you'll go
   offline". It always asks when you'd go offline or when an SSH or Screen Sharing
   session could drop. Dormant services never ask.
 - Shows a service coming up. Right after you turn one on, its row says
@@ -47,7 +51,10 @@ state, and a switch.
   network.
 
 <p align="center">
-  <img src="docs/details.png" alt="crossbar in the menu bar with per-service hover detail" width="460">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/warning-dark.png">
+    <img src="docs/screenshots/warning-light.png" alt="Confirmation before turning off Ethernet: traffic will move to Wi-Fi (Harbor Lane), with Cancel and Turn Off buttons" width="324">
+  </picture>
 </p>
 
 ## Requirements
@@ -149,13 +156,18 @@ is enough to read the network name.
 **Settings…** in the popover covers:
 
 - Launch at Login
-
 - Show network name in menu bar
-
 - Ask before moving traffic to another service. Going offline or dropping a
   remote session always asks, whatever this is set to.
 - Passwordless toggling: its status, and Set Up, Open Login Items, and Remove
   buttons.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-dark.png">
+    <img src="docs/screenshots/settings-light.png" alt="crossbar Settings window with General options and Passwordless Toggling status" width="484">
+  </picture>
+</p>
 
 ## Shortcuts and Focus
 

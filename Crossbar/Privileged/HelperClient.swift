@@ -39,9 +39,14 @@ enum HelperStatus: Equatable {
 final class HelperClient: HelperBackend {
     private var service: SMAppService { SMAppService.daemon(plistName: HelperConstants.plistName) }
 
-    var status: HelperStatus { HelperStatus(service.status) }
-    var isEnabled: Bool { service.status == .enabled }
-    var requiresApproval: Bool { service.status == .requiresApproval }
+    var status: HelperStatus {
+        #if DEBUG
+        if DemoData.active { return .enabled }
+        #endif
+        return HelperStatus(service.status)
+    }
+    var isEnabled: Bool { status == .enabled }
+    var requiresApproval: Bool { status == .requiresApproval }
 
     /// Register the helper. It usually lands in `.requiresApproval` until the user
     /// turns it on under Login Items & Extensions.

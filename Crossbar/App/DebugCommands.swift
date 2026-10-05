@@ -19,6 +19,7 @@ import SystemConfiguration
 ///   --login-item [on|off]              print, or set, Launch at Login
 ///   --snapshot <dir>                   render the popover (live and sample) and Settings to PNGs
 ///   --ui-selftest                      drive the popover with key events and check the menu bar flash
+///   --demo <view> [light|dark]         show popover, warning, or settings with sample data, until killed
 enum DebugCommands {
     /// Returns an exit code if a debug flag was handled, or nil to launch normally.
     static func run(_ args: [String]) -> Int32? {
@@ -71,6 +72,17 @@ enum DebugCommands {
         case "--remote-sessions":
             let sessions = RemoteSessions.current()
             print(RemoteSessions.warning(for: sessions) ?? "no remote sessions")
+            return 0
+
+        case "--demo":
+            DemoData.active = true   // before anything reads services or settings
+            let app = NSApplication.shared
+            app.setActivationPolicy(.accessory)
+            if args.count >= 4 { app.appearance = NSAppearance(named: args[3] == "light" ? .aqua : .darkAqua) }
+            let controller = StatusItemController()
+            let view = args.count >= 3 ? args[2] : "popover"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { controller.debugDemo(view) }
+            app.run()   // until killed
             return 0
 
         case "--ui-selftest":

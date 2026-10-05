@@ -142,6 +142,9 @@ final class StatusMonitor: ObservableObject {
     ///   - ssid: looks up the Wi-Fi network name for a BSD interface.
     static func readServices(store: SCDynamicStore? = nil,
                              ssid: (String) -> String? = { _ in nil }) -> [NetworkServiceState] {
+        #if DEBUG
+        if DemoData.active { return DemoData.services }
+        #endif
         // A fresh SCPreferences snapshot reflects the latest on-disk config, so
         // enable/disable changes made in System Settings show up here.
         guard let prefs = SCPreferencesCreate(nil, "com.breed.Crossbar" as CFString, nil),
