@@ -276,7 +276,7 @@ private enum Snapshots {
             NetworkServiceState(id: "USB", name: "USB 10/100/1000 LAN", bsdName: "en8", isEnabled: true,
                                 ipv4Address: nil, router: nil, hasActiveLink: false,
                                 isPrimary: false, kind: .wired, ssid: nil, orderIndex: 1),
-            NetworkServiceState(id: "VPN", name: "Office VPN", bsdName: nil, isEnabled: true,
+            NetworkServiceState(id: "VPN", name: "Corp VPN", bsdName: nil, isEnabled: true,
                                 ipv4Address: nil, router: nil, hasActiveLink: false,
                                 isPrimary: false, kind: .vpn, ssid: nil, orderIndex: 3),
             NetworkServiceState(id: "BR", name: "Thunderbolt Bridge", bsdName: "bridge0", isEnabled: false,
