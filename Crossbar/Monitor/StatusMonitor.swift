@@ -20,26 +20,17 @@ import SystemConfiguration
 /// `services` is the single `@Published` snapshot the UI binds to.
 ///
 /// **Visible set.** `SCNetworkSetCopyServices` returns *every* configured
-/// service, including phantom entries that System Settings hides (e.g. unused
-/// Thunderbolt-slot "Ethernet Adapter (enN)" services). To match what the user
-/// actually sees — and to guarantee every row is a name the M2 toggle command
-/// accepts — we gate the list through `networksetup -listallnetworkservices`,
-/// the same tool that defines the user-facing/togglable universe. SCDynamicStore
-/// remains the live-state source and the change trigger; the only subprocess
-/// runs on change events (never on a timer) and off the main thread.
+/// service, including entries System Settings hides (the internal Apple silicon
+/// USB-C interfaces, "Ethernet Adapter (en4)" and friends). `HiddenInterfaces`
+/// reads the same `HiddenConfiguration` flag System Settings uses, so the list
+/// matches it without running `networksetup`. A refresh is a handful of
+/// SystemConfiguration reads, so it runs synchronously on the main thread.
 final class StatusMonitor: ObservableObject {
     @Published private(set) var services: [NetworkServiceState] = []
 
     private var store: SCDynamicStore?
     private var runLoopSource: CFRunLoopSource?
     private var refreshScheduled = false
-
-    /// Guards against overlapping background refreshes. A refresh requested
-    /// while one is already running sets `refreshPending` instead of spawning a
-    /// second `networksetup` process; the in-flight refresh re-runs when it sees
-    /// the flag. Touched only on the main thread.
-    private var refreshInFlight = false
-    private var refreshPending = false
 
     /// Supplies the connected Wi-Fi SSID (needs Location Services; see the type).
     private let wifiProvider = WiFiSSIDProvider()
@@ -136,102 +127,45 @@ final class StatusMonitor: ObservableObject {
 
     // MARK: - Enumeration
 
-    /// Two-phase refresh: fetch the user-facing service names off the main
-    /// thread (the only subprocess), then assemble the model from
-    /// SCPreferences + SCDynamicStore back on main and publish.
-    ///
-    /// Coalesces overlapping requests: if a refresh is already running, this
-    /// just marks one pending rather than launching a second concurrent
-    /// `networksetup`. Must be called on the main thread (all callers are).
+    /// Re-read and publish. Runs on the main thread, where the SCDynamicStore
+    /// notifications arrive, so all SC reads stay serialized.
     private func refresh() {
-        guard !refreshInFlight else {
-            refreshPending = true
-            return
-        }
-        refreshInFlight = true
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let visibleNames = self?.userFacingServiceNames()
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.rebuildModel(visibleNames: visibleNames)
-                self.refreshInFlight = false
-                if self.refreshPending {
-                    self.refreshPending = false
-                    self.refresh()
-                }
-            }
-        }
+        services = Self.readServices(store: store) { [wifiProvider] bsd in wifiProvider.ssid(forBSD: bsd) }
     }
 
-    /// The set of service names System Settings considers user-facing, via
-    /// `networksetup -listallnetworkservices`. Returns `nil` if the command
-    /// can't be run, in which case we degrade to showing everything rather
-    /// than an empty list.
-    private func userFacingServiceNames() -> Set<String>? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/networksetup")
-        process.arguments = ["-listallnetworkservices"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        do { try process.run() } catch { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0,
-              let output = String(data: data, encoding: .utf8) else { return nil }
-
-        // First line is the "An asterisk (*) denotes..." legend; a leading "*"
-        // on a service line marks it disabled (state we read from SC anyway).
-        // We insert BOTH the raw line and the asterisk-stripped form: stripping
-        // is right for the common "*Disabled Service" case, but a service whose
-        // real name legitimately starts with "*" would be corrupted by blindly
-        // stripping — keeping the raw form too means it still matches its SC name.
-        var names = Set<String>()
-        for line in output.split(separator: "\n").dropFirst() {
-            let raw = String(line).trimmingCharacters(in: .whitespaces)
-            names.insert(raw)
-            if raw.hasPrefix("*") {
-                names.insert(String(raw.dropFirst()).trimmingCharacters(in: .whitespaces))
-            }
-        }
-        return names
-    }
-
-    /// Assemble and publish the model. Runs on the main thread (same thread the
-    /// SCDynamicStore notifications arrive on), so all SC reads stay serialized.
-    private func rebuildModel(visibleNames: Set<String>?) {
-        // A fresh SCPreferences snapshot reflects the latest on-disk config,
-        // so enable/disable changes made in System Settings show up here.
+    /// Build the model from SCPreferences (identity, enabled flag, service order)
+    /// and SCDynamicStore (addresses, link, the primary service). Static so
+    /// Shortcuts and the debug flags can read services without a live monitor.
+    ///
+    /// - Parameters:
+    ///   - store: a dynamic store to read from; a temporary one is made if nil.
+    ///   - ssid: looks up the Wi-Fi network name for a BSD interface.
+    static func readServices(store: SCDynamicStore? = nil,
+                             ssid: (String) -> String? = { _ in nil }) -> [NetworkServiceState] {
+        // A fresh SCPreferences snapshot reflects the latest on-disk config, so
+        // enable/disable changes made in System Settings show up here.
         guard let prefs = SCPreferencesCreate(nil, "com.breed.Crossbar" as CFString, nil),
               let set = SCNetworkSetCopyCurrent(prefs),
               let rawServices = SCNetworkSetCopyServices(set) as? [SCNetworkService]
-        else {
-            services = []
-            return
-        }
+        else { return [] }
+        let store = store ?? SCDynamicStoreCreate(nil, "com.breed.Crossbar.read" as CFString, nil, nil)
+        let reader = DynamicState(store: store)
 
         let order = (SCNetworkSetGetServiceOrder(set) as? [String]) ?? []
-        let primaryID = primaryServiceID()
+        let primaryID = reader.primaryServiceID()
 
         var result: [NetworkServiceState] = []
-        for service in rawServices {
+        for service in rawServices where !HiddenInterfaces.isHidden(service) {
             guard let id = SCNetworkServiceGetServiceID(service) as String?,
                   let name = SCNetworkServiceGetName(service) as String?
             else { continue }
-
-            // Hide services System Settings hides (phantom adapters), unless
-            // networksetup was unavailable (visibleNames == nil → show all).
-            if let visibleNames, !visibleNames.contains(name) { continue }
 
             let interface = SCNetworkServiceGetInterface(service)
             let bsd = interface.flatMap { SCNetworkInterfaceGetBSDName($0) as String? }
             let interfaceType = interface.flatMap { SCNetworkInterfaceGetInterfaceType($0) as String? }
             let kind = Self.kind(forInterfaceType: interfaceType)
             let enabled = SCNetworkServiceGetEnabled(service)
-            let (address, router) = ipv4Info(serviceID: id)
-            let linkActive = bsd.map { self.linkActive(bsd: $0) } ?? false
-            let ssid = (kind == .wifi && enabled) ? bsd.flatMap { wifiProvider.ssid(forBSD: $0) } : nil
+            let (address, router) = reader.ipv4Info(serviceID: id)
 
             result.append(NetworkServiceState(
                 id: id,
@@ -240,23 +174,21 @@ final class StatusMonitor: ObservableObject {
                 isEnabled: enabled,
                 ipv4Address: address,
                 router: router,
-                hasActiveLink: linkActive,
+                hasActiveLink: bsd.map { reader.linkActive(bsd: $0) } ?? false,
                 isPrimary: id == primaryID,
                 kind: kind,
-                ssid: ssid
+                ssid: (kind == .wifi && enabled) ? bsd.flatMap(ssid) : nil,
+                orderIndex: order.firstIndex(of: id) ?? Int.max
             ))
         }
 
         // Prioritize by category (wired → Wi-Fi → VPN → bridges → other), then
         // by the configured service order within a category, then by name.
-        let orderIndex: (NetworkServiceState) -> Int = { order.firstIndex(of: $0.id) ?? Int.max }
         result.sort { a, b in
             if a.kind.sortRank != b.kind.sortRank { return a.kind.sortRank < b.kind.sortRank }
-            let ia = orderIndex(a), ib = orderIndex(b)
-            return ia != ib ? ia < ib : a.name < b.name
+            return a.orderIndex != b.orderIndex ? a.orderIndex < b.orderIndex : a.name < b.name
         }
-
-        services = result
+        return result
     }
 
     /// Map an `SCNetworkInterfaceGetInterfaceType` value to a coarse category.
@@ -283,38 +215,32 @@ final class StatusMonitor: ObservableObject {
         return .other
     }
 
-    // MARK: - SCDynamicStore reads
+}
 
-    /// The service ID currently owning the default route — i.e. the one actually
-    /// carrying traffic when several services are connected at once. Prefers the
-    /// IPv4 primary, falling back to IPv6 so the "active route" marker still
-    /// appears on IPv6-only networks (where Global/IPv4 has no PrimaryService).
-    private func primaryServiceID() -> String? {
+/// Reads live state from the dynamic store. No privileges needed.
+private struct DynamicState {
+    let store: SCDynamicStore?
+
+    private func value(_ key: String) -> [String: Any]? {
         guard let store else { return nil }
-        for key in ["State:/Network/Global/IPv4", "State:/Network/Global/IPv6"] {
-            if let dict = SCDynamicStoreCopyValue(store, key as CFString) as? [String: Any],
-               let primary = dict["PrimaryService"] as? String {
-                return primary
-            }
-        }
-        return nil
+        return SCDynamicStoreCopyValue(store, key as CFString) as? [String: Any]
     }
 
-    private func ipv4Info(serviceID: String) -> (address: String?, router: String?) {
-        guard let store else { return (nil, nil) }
-        let key = "State:/Network/Service/\(serviceID)/IPv4" as CFString
-        guard let dict = SCDynamicStoreCopyValue(store, key) as? [String: Any] else {
-            return (nil, nil)
-        }
-        let address = (dict["Addresses"] as? [String])?.first
-        let router = dict["Router"] as? String
-        return (address, router)
+    /// The service ID currently owning the default route — the one actually
+    /// carrying traffic when several services are connected. Prefers the IPv4
+    /// primary, falling back to IPv6 so the "active route" marker still appears
+    /// on IPv6-only networks.
+    func primaryServiceID() -> String? {
+        (value("State:/Network/Global/IPv4")?["PrimaryService"]
+         ?? value("State:/Network/Global/IPv6")?["PrimaryService"]) as? String
     }
 
-    private func linkActive(bsd: String) -> Bool {
-        guard let store else { return false }
-        let key = "State:/Network/Interface/\(bsd)/Link" as CFString
-        guard let dict = SCDynamicStoreCopyValue(store, key) as? [String: Any] else { return false }
-        return (dict["Active"] as? Bool) ?? false
+    func ipv4Info(serviceID: String) -> (address: String?, router: String?) {
+        guard let dict = value("State:/Network/Service/\(serviceID)/IPv4") else { return (nil, nil) }
+        return ((dict["Addresses"] as? [String])?.first, dict["Router"] as? String)
+    }
+
+    func linkActive(bsd: String) -> Bool {
+        (value("State:/Network/Interface/\(bsd)/Link")?["Active"] as? Bool) ?? false
     }
 }

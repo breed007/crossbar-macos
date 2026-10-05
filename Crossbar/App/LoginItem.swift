@@ -10,6 +10,8 @@ enum LoginItem {
         SMAppService.mainApp.status == .enabled
     }
 
+    static var status: HelperStatus { HelperStatus(SMAppService.mainApp.status) }
+
     /// Turn launch-at-login on or off. Throws if the system rejects the change
     /// (e.g. the user must approve it in Login Items & Extensions).
     static func setEnabled(_ enabled: Bool) throws {

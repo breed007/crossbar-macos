@@ -1,20 +1,31 @@
 import Cocoa
 import Combine
 
-/// Popover contents: a title and one `ServiceRowView` per network service,
-/// rebuilt whenever the `StatusMonitor` publishes a new snapshot. Owns the
-/// `PrivilegedToggle` and translates switch flips into privileged calls.
+/// Popover contents: a title, one `ServiceRowView` per network service, and a
+/// footer. Rebuilt whenever the `StatusMonitor` publishes a new snapshot. Turns
+/// switch flips and key presses into privileged calls through `PrivilegedToggle`.
 final class PopoverViewController: NSViewController {
+    /// Set by `StatusItemController`.
+    var onOpenSettings: (() -> Void)?
+    var onClose: (() -> Void)?
+
     private let monitor: StatusMonitor
     private let toggle: PrivilegedToggle
-    /// Non-nil when the toggle is a router that can install the privileged helper
-    /// — used to offer the "Set up helper" affordance and reflect its status.
-    private var router: ToggleRouter? { toggle as? ToggleRouter }
+    private let helperClient = HelperClient()
+    private let preferences = Preferences()
     private var cancellable: AnyCancellable?
 
-    /// Service names with a toggle currently in flight, so a second flip on the
-    /// same row before the first completes is ignored.
+    /// Service IDs with a toggle in flight, so a second flip on the same row before
+    /// the first completes is ignored. Keyed by ID: two services can share a name.
     private var inFlight: Set<String> = []
+    /// Services just turned on that are still coming up (F4).
+    private var settling = SettlingTracker()
+    /// The keyboard selection (F7), by service ID so it survives rebuilds.
+    private var highlightedID: String?
+    private var rows: [ServiceRowView] = []
+    /// For fading in the "active route" badge when traffic moves to another row.
+    private var lastPrimaryID: String?
+    private var hasRendered = false
 
     private let contentStack = NSStackView()
     private static let contentWidth: CGFloat = 280
@@ -29,11 +40,12 @@ final class PopoverViewController: NSViewController {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        let container = NSView()
+        let container = KeyHandlingView()
+        container.onKeyDown = { [weak self] event in self?.handleKey(event) ?? false }
 
         contentStack.orientation = .vertical
         contentStack.alignment = .leading
-        contentStack.spacing = 6
+        contentStack.spacing = 4
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(contentStack)
 
@@ -59,11 +71,27 @@ final class PopoverViewController: NSViewController {
             .sink { [weak self] in self?.rebuild(with: $0) }
     }
 
+    /// Called just before the popover opens: clear the keyboard selection and
+    /// rebuild, so the footer reflects any helper change made in Settings.
+    func prepareToShow() {
+        highlightedID = nil
+        rebuild(with: monitor.services)
+    }
+
+    /// Take keyboard focus once the popover's window is key.
+    func focus() {
+        view.window?.makeFirstResponder(view)
+    }
+
+    // MARK: - Building the list
+
     private func rebuild(with services: [NetworkServiceState]) {
+        settling.prune(services)
         contentStack.arrangedSubviews.forEach {
             contentStack.removeArrangedSubview($0)
             $0.removeFromSuperview()
         }
+        rows = []
 
         let title = NSTextField(labelWithString: "Network Services")
         title.font = .systemFont(ofSize: 11, weight: .semibold)
@@ -75,64 +103,62 @@ final class PopoverViewController: NSViewController {
             empty.font = .systemFont(ofSize: 13)
             empty.textColor = .tertiaryLabelColor
             contentStack.addArrangedSubview(empty)
-        } else {
-            for service in services {
-                let row = ServiceRowView(state: service) { [weak self] desiredEnabled, row in
-                    self?.handleToggle(service: service, enable: desiredEnabled, row: row)
-                }
-                // A row whose toggle is mid-flight stays disabled until it lands.
-                row.setToggleEnabled(!inFlight.contains(service.name))
-                contentStack.addArrangedSubview(row)
-                row.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
-            }
         }
+        for service in services {
+            let row = ServiceRowView(state: service, settling: settling.isSettling(service.id)) { [weak self] desiredEnabled, row in
+                self?.handleToggle(serviceID: service.id, enable: desiredEnabled, row: row)
+            }
+            // A row whose toggle is mid-flight stays disabled until it lands.
+            row.setToggleEnabled(!inFlight.contains(service.id))
+            row.isHighlighted = service.id == highlightedID
+            contentStack.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+            rows.append(row)
+        }
+        if highlightedID != nil, !services.contains(where: { $0.id == highlightedID }) { highlightedID = nil }
 
-        // Footer: a separator, a "Launch at Login" checkbox, then a deep link to
-        // the native Network settings (for the full data we deliberately omit)
-        // and a Quit action.
+        // Traffic moved to another service: make the badge's move visible.
+        let primaryID = services.first(where: \.isPrimary)?.id
+        if hasRendered, let primaryID, primaryID != lastPrimaryID {
+            rows.first { $0.serviceID == primaryID }?.animateRouteArrival()
+        }
+        lastPrimaryID = primaryID
+        hasRendered = true
+
+        addFooter()
+
+        // Size the popover to fit the current contents.
+        view.layoutSubtreeIfNeeded()
+        preferredContentSize = NSSize(width: Self.contentWidth, height: view.fittingSize.height)
+    }
+
+    /// Set Up Passwordless Toggling… until the helper is enabled, then Settings…,
+    /// Network Settings…, and Quit (F6). Everything else lives in Settings.
+    private func addFooter() {
         let separator = NSBox()
         separator.boxType = .separator
         separator.translatesAutoresizingMaskIntoConstraints = false
         contentStack.addArrangedSubview(separator)
         separator.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
 
-        let launchToggle = NSButton(checkboxWithTitle: "Launch at Login",
-                                    target: self, action: #selector(toggleLaunchAtLogin(_:)))
-        launchToggle.font = .systemFont(ofSize: 11)
-        launchToggle.state = LoginItem.isEnabled ? .on : .off
-        contentStack.addArrangedSubview(launchToggle)
-
-        // Helper status / setup. When the privileged helper (Backend B) isn't
-        // installed, offer to set it up (removes the need for the sudoers rule).
-        // When it's active, show a subtle confirmation instead.
-        if let router {
-            if router.usingHelper {
-                let active = NSTextField(labelWithString: "✓ Passwordless toggling active")
-                active.font = .systemFont(ofSize: 11)
-                active.textColor = .secondaryLabelColor
-                contentStack.addArrangedSubview(active)
-            } else {
-                let setup = makeFooterButton(title: "Set up passwordless toggling…",
-                                             action: #selector(setUpHelper))
-                setup.contentTintColor = .controlAccentColor
-                contentStack.addArrangedSubview(setup)
-            }
+        if !helperClient.isEnabled {
+            let setup = makeFooterButton(title: "Set Up Passwordless Toggling…", action: #selector(setUpHelper))
+            setup.contentTintColor = .controlAccentColor
+            contentStack.addArrangedSubview(setup)
         }
 
-        let settingsButton = makeFooterButton(title: "Network Settings…",
-                                              action: #selector(openNetworkSettings))
-        let quitButton = makeFooterButton(title: "Quit", action: #selector(quit))
-        let footerSpacer = NSView()
-        footerSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let footer = NSStackView(views: [settingsButton, footerSpacer, quitButton])
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let footer = NSStackView(views: [
+            makeFooterButton(title: "Settings…", action: #selector(openSettings)),
+            makeFooterButton(title: "Network Settings…", action: #selector(openNetworkSettings)),
+            spacer,
+            makeFooterButton(title: "Quit", action: #selector(quit)),
+        ])
         footer.orientation = .horizontal
-        footer.spacing = 8
+        footer.spacing = 10
         contentStack.addArrangedSubview(footer)
         footer.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
-
-        // Size the popover to fit the current contents.
-        view.layoutSubtreeIfNeeded()
-        preferredContentSize = NSSize(width: Self.contentWidth, height: view.fittingSize.height)
     }
 
     private func makeFooterButton(title: String, action: Selector) -> NSButton {
@@ -145,134 +171,102 @@ final class PopoverViewController: NSViewController {
         return button
     }
 
-    /// Opens the native Network settings pane — for when the full detail we
-    /// deliberately omit (subnet, DNS, IPv6, …) is actually wanted.
-    @objc private func openNetworkSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.Network-Settings.extension") {
-            NSWorkspace.shared.open(url)
+    // MARK: - Keyboard (F7)
+
+    /// Up and Down move the highlight; Space or Return toggles the highlighted
+    /// service through the same checks as a click; Escape closes the popover.
+    private func handleKey(_ event: NSEvent) -> Bool {
+        switch event.keyCode {
+        case 125: moveHighlight(by: 1); return true      // down arrow
+        case 126: moveHighlight(by: -1); return true     // up arrow
+        case 49, 36, 76:                                  // space, return, enter
+            rows.first { $0.serviceID == highlightedID }?.flipFromKeyboard()
+            return highlightedID != nil
+        case 53: onClose?(); return true                  // escape
+        default: return false
         }
     }
 
-    @objc private func quit() {
-        NSApp.terminate(nil)
-    }
-
-    @objc private func toggleLaunchAtLogin(_ sender: NSButton) {
-        let wantOn = sender.state == .on
-        do {
-            try LoginItem.setEnabled(wantOn)
-            // If macOS parked the request pending user approval, the login item
-            // isn't actually on yet — reflect that and point the user at Settings.
-            if wantOn && LoginItem.requiresApproval {
-                sender.state = .off
-                presentLoginApprovalNeeded()
-            }
-        } catch {
-            // Revert the checkbox to the true state and surface why.
-            sender.state = LoginItem.isEnabled ? .on : .off
-            let alert = NSAlert()
-            alert.alertStyle = .warning
-            alert.messageText = "Couldn’t change “Launch at Login”"
-            alert.informativeText = error.localizedDescription
-            alert.addButton(withTitle: "OK")
-            NSApp.activate(ignoringOtherApps: true)
-            alert.runModal()
+    private func moveHighlight(by step: Int) {
+        guard !rows.isEmpty else { return }
+        let current = rows.firstIndex { $0.serviceID == highlightedID }
+        let next: Int
+        if let current {
+            next = min(max(current + step, 0), rows.count - 1)
+        } else {
+            next = step > 0 ? 0 : rows.count - 1
         }
+        highlightedID = rows[next].serviceID
+        for row in rows { row.isHighlighted = row.serviceID == highlightedID }
     }
 
-    @objc private func setUpHelper() {
-        guard let router else { return }
-        do {
-            try router.helper.install()
-            let alert = NSAlert()
-            alert.alertStyle = .informational
-            if router.helper.requiresApproval {
-                alert.messageText = "One more step"
-                alert.informativeText = "Enable Crossbar’s background item under System "
-                    + "Settings → General → Login Items & Extensions to finish setting up "
-                    + "passwordless toggling."
-                alert.addButton(withTitle: "Open Settings")
-                alert.addButton(withTitle: "Later")
-                NSApp.activate(ignoringOtherApps: true)
-                if alert.runModal() == .alertFirstButtonReturn,
-                   let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
-                    NSWorkspace.shared.open(url)
-                }
-            } else {
-                alert.messageText = "Passwordless toggling is set up"
-                alert.informativeText = "Crossbar can now enable and disable network "
-                    + "services without the sudo rule."
-                alert.addButton(withTitle: "OK")
-                NSApp.activate(ignoringOtherApps: true)
-                alert.runModal()
-            }
-            monitor.refreshNow()   // refresh footer to reflect new status
-        } catch {
-            let alert = NSAlert()
-            alert.alertStyle = .warning
-            alert.messageText = "Couldn’t set up the helper"
-            alert.informativeText = error.localizedDescription
-            alert.addButton(withTitle: "OK")
-            NSApp.activate(ignoringOtherApps: true)
-            alert.runModal()
-        }
-    }
+    // MARK: - Toggling
 
-    private func presentLoginApprovalNeeded() {
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = "Approval needed"
-        alert.informativeText = "Turn on Crossbar under System Settings → General → "
-            + "Login Items & Extensions to have it launch at login."
-        alert.addButton(withTitle: "Open Login Items")
-        alert.addButton(withTitle: "Cancel")
-        NSApp.activate(ignoringOtherApps: true)
-        if alert.runModal() == .alertFirstButtonReturn,
-           let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    private func handleToggle(service: NetworkServiceState, enable: Bool, row: ServiceRowView) {
-        // Security hygiene: only ever drive the privileged path with a name that
-        // is present in the *current* live enumerated set. Rows are built from
-        // that set, but we re-check in case the snapshot changed underneath us.
-        guard monitor.services.contains(where: { $0.name == service.name }) else {
+    private func handleToggle(serviceID: String, enable: Bool, row: ServiceRowView) {
+        // Security hygiene: only drive the privileged path with a service that is in
+        // the *current* live enumerated set. Rows are built from that set, but the
+        // snapshot can change underneath us.
+        guard let service = monitor.services.first(where: { $0.id == serviceID }) else {
             monitor.refreshNow()
             return
         }
-        guard !inFlight.contains(service.name) else { return }
-        inFlight.insert(service.name)
-        // Freeze the just-clicked switch immediately so a rapid second click
-        // can't visually flip it back while the first call is still in flight.
+        guard !inFlight.contains(serviceID) else { return }
+        row.setToggleOn(enable)
+
+        // F3: before turning off the service carrying traffic, say what happens.
+        if !enable {
+            let prediction = RoutePrediction.disabling(serviceID, in: monitor.services)
+            let remote = prediction == .notActiveRoute ? [] : RemoteSessions.current()
+            if let confirmation = ToggleConfirmation.plan(serviceName: service.name, prediction: prediction,
+                                                          remoteSessions: remote,
+                                                          confirmHandoff: preferences.confirmRouteHandoff),
+               !confirmation.confirm(preferences) {
+                row.setToggleOn(service.isEnabled)   // canceled: put the switch back
+                return
+            }
+        }
+
+        inFlight.insert(serviceID)
+        // Freeze the just-clicked switch so a rapid second click can't visually flip
+        // it back while the first call is still in flight.
         row.setToggleEnabled(false)
 
         Task { @MainActor [weak self] in
             guard let self else { return }
             var succeeded = false
             defer {
-                self.inFlight.remove(service.name)
+                self.inFlight.remove(serviceID)
                 if succeeded {
-                    // The system state changed, so refreshNow() publishes a
-                    // *different* snapshot → rebuild() replaces this row with a
-                    // fresh, correctly-positioned one. Nothing to do to the row.
+                    // The system state changed, so refreshNow() publishes a different
+                    // snapshot and rebuild() replaces this row with a fresh one.
+                    if enable { self.scheduleSettling(serviceID) }
                     self.monitor.refreshNow()
+                    NotificationCenter.default.post(name: .crossbarServiceToggled, object: nil,
+                                                    userInfo: ["name": service.name, "enabled": enable])
                 } else {
-                    // FAILURE: the model is unchanged, so refreshNow() would
-                    // publish an equal snapshot that removeDuplicates() drops —
-                    // no rebuild lands, and the row we froze above would stay
-                    // stuck showing the wrong position. So revert and re-enable
-                    // this row directly, to its true (unchanged) state.
+                    // FAILURE: the model is unchanged, so refreshNow() would publish an
+                    // equal snapshot that removeDuplicates() drops. No rebuild would
+                    // land and the frozen row would stay stuck, so restore it here.
                     row.setToggleOn(service.isEnabled)
                     row.setToggleEnabled(true)
                 }
             }
             do {
-                try await self.toggle.setEnabled(enable, serviceID: service.id, serviceName: service.name)
+                try await self.toggle.setEnabled(enable, serviceID: serviceID, serviceName: service.name)
                 succeeded = true
             } catch {
                 self.presentToggleError(error, serviceName: service.name)
             }
+        }
+    }
+
+    /// Show "Connecting…" until the service connects or the window runs out. The
+    /// timeout needs its own rebuild: if nothing else changes, no snapshot arrives.
+    private func scheduleSettling(_ serviceID: String) {
+        settling.begin(serviceID)
+        DispatchQueue.main.asyncAfter(deadline: .now() + SettlingTracker.window + 0.5) { [weak self] in
+            guard let self, self.settling.isSettling(serviceID) else { return }
+            self.rebuild(with: self.monitor.services)
         }
     }
 
@@ -283,15 +277,56 @@ final class PopoverViewController: NSViewController {
         alert.informativeText = error.localizedDescription
 
         if case PrivilegedToggleError.sudoRuleMissing = error {
-            alert.informativeText += "\n\nInstall it once with:\n\n"
+            alert.informativeText += "\n\nTo use the sudo rule instead, run:\n\n"
                 + "sudo visudo -f /etc/sudoers.d/crossbar\n\n"
-                + "then add this line:\n\n"
+                + "and add this line:\n\n"
                 + "\(NSUserName()) ALL=(root) NOPASSWD: /usr/sbin/networksetup -setnetworkserviceenabled *"
+            alert.addButton(withTitle: "Set Up Passwordless Toggling…")
+            alert.addButton(withTitle: "Cancel")
+            NSApp.activate(ignoringOtherApps: true)
+            if alert.runModal() == .alertFirstButtonReturn { setUpHelper() }
+            return
         }
         alert.addButton(withTitle: "OK")
-
         // Accessory apps aren't active by default; bring the alert forward.
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
+    }
+
+    // MARK: - Footer actions
+
+    @objc private func setUpHelper() {
+        HelperSetup.run(helperClient)
+        // The service list didn't change, so the monitor's next snapshot would be
+        // deduplicated away. Rebuild directly so the footer shows the new status.
+        rebuild(with: monitor.services)
+    }
+
+    @objc private func openSettings() {
+        onClose?()
+        onOpenSettings?()
+    }
+
+    /// Opens the native Network settings pane, for the detail Crossbar omits.
+    @objc private func openNetworkSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Network-Settings.extension") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    @objc private func quit() {
+        NSApp.terminate(nil)
+    }
+}
+
+/// The popover's root view: takes keyboard focus and hands key presses to the
+/// controller. Unhandled keys go up the responder chain as usual.
+final class KeyHandlingView: NSView {
+    var onKeyDown: ((NSEvent) -> Bool)?
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        if onKeyDown?(event) != true { super.keyDown(with: event) }
     }
 }

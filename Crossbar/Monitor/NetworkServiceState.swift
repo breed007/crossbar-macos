@@ -43,6 +43,15 @@ struct NetworkServiceState: Identifiable, Equatable {
     let isPrimary: Bool      // currently carrying the default route (active route)
     let kind: Kind           // interface category, drives list priority
     let ssid: String?        // connected Wi-Fi network name (Wi-Fi only)
+    /// Position in the network set's service order, which macOS uses to pick the
+    /// route when several services are connected. `Int.max` if it isn't listed.
+    var orderIndex: Int = Int.max
+
+    /// The name used in messages: "Wi-Fi (MI6)" when the SSID is known.
+    var spokenName: String {
+        guard let ssid else { return name }
+        return "\(name) (\(ssid))"
+    }
 
     var connectivity: Connectivity {
         guard isEnabled else { return .inactive }

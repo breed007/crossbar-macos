@@ -12,9 +12,12 @@ import Foundation
 ///     overlapping `networksetup` invocations.
 ///   - `sudo -n` (non-interactive) means a missing sudoers rule fails fast with
 ///     a detectable error instead of silently hanging on a password prompt.
+///   - A `networksetup` that hangs is terminated after `timeout` seconds, so a
+///     wedged process can't freeze a row (and the serial queue behind it) forever.
 final class NetworksetupToggle: PrivilegedToggle {
     private static let networksetupPath = "/usr/sbin/networksetup"
     private static let sudoPath = "/usr/bin/sudo"
+    private static let timeout: TimeInterval = 20
 
     /// Serial queue → at most one networksetup process at a time.
     private let queue = DispatchQueue(label: "com.breed.Crossbar.PrivilegedToggle")
@@ -54,8 +57,20 @@ final class NetworksetupToggle: PrivilegedToggle {
             throw PrivilegedToggleError.launchFailed(error.localizedDescription)
         }
 
+        // Watchdog: terminating sudo (which relays the signal to networksetup)
+        // closes stderr, which unblocks the read below.
+        let fired = TimeoutFlag()
+        let watchdog = DispatchWorkItem { [weak process] in
+            guard let process, process.isRunning else { return }
+            fired.set()
+            process.terminate()
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
+
         let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
+        watchdog.cancel()
+        if fired.isSet { throw PrivilegedToggleError.timedOut }
         let stderrText = String(data: stderrData, encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
@@ -70,4 +85,12 @@ final class NetworksetupToggle: PrivilegedToggle {
                 status: process.terminationStatus, message: stderrText)
         }
     }
+}
+
+/// Set by the watchdog on another queue, read after the process exits.
+private final class TimeoutFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    func set() { lock.lock(); value = true; lock.unlock() }
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
 }
