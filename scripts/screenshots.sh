@@ -59,14 +59,18 @@ for view in popover warning settings; do
   for look in light dark; do
     "$BIN" --demo "$view" "$look" >"$OUT_DIR/demo-$view-$look.log" 2>&1 &
     pid=$!
-    bounds=""
-    for _ in $(seq 1 30); do          # up to ~6 s for the UI to appear
+    # Wait until the window's bounds read the same twice in a row (up to ~8 s). The
+    # first sighting isn't always the final size: the popover animates open, and a
+    # dialog can be on screen mid-layout. A single re-read after a fixed pause can
+    # still catch it moving.
+    bounds=""; prev=""
+    for _ in $(seq 1 40); do
       sleep 0.2
-      bounds=$("$FINDER" "$pid" 2>/dev/null) && [ -n "$bounds" ] && break
+      bounds=$("$FINDER" "$pid" 2>/dev/null) || bounds=""
+      [ -n "$bounds" ] && [ "$bounds" = "$prev" ] && break
+      prev="$bounds"
     done
-    sleep 0.8                         # let it finish drawing (and the popover animating open)
-    # Read the bounds again now that it's settled: the first sighting can be mid-animation.
-    [ -n "$bounds" ] && bounds=$("$FINDER" "$pid" 2>/dev/null || echo "$bounds")
+    sleep 0.8                         # let it finish drawing
     if [ -n "$bounds" ]; then
       # The composited region, with room for the shadow. The backdrop covers the menu
       # bar too, so the margin above the popover is backdrop, not menu bar.

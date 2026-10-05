@@ -2,8 +2,8 @@ import XCTest
 
 final class HelperConstantsTests: XCTestCase {
     func testRealServiceIDsAreWellFormed() {
-        XCTAssertTrue(HelperConstants.isWellFormedServiceID("D98EBBFE-336E-40B0-966C-81AA31D60CDF"))
-        XCTAssertTrue(HelperConstants.isWellFormedServiceID("558da122-9f8f-4878-a395-ee68948176a5"))
+        XCTAssertTrue(HelperConstants.isWellFormedServiceID("DC3DB9BB-06D0-4D5D-A1E4-7C6C499D9A7D"))
+        XCTAssertTrue(HelperConstants.isWellFormedServiceID("C7E15396-4978-43DD-B518-F490D5368212"))
     }
 
     func testIDsThatCouldForgeALogLineAreRefused() {
