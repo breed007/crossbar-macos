@@ -8,10 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.6.0] — 2026-10-04
 
 ### Fixed
-- **Set Up Passwordless Toggling now works.** On macOS 27, registering the helper
-  reports "Operation not permitted" even when it succeeded and is waiting for
-  approval, so 0.5.0 showed an error instead of the approval steps. Any setup
-  failure now points to Login Items & Extensions, where it can be fixed.
+- **Set Up Passwordless Toggling no longer dead-ends on "Operation not permitted."**
+  macOS refuses to register the helper while an earlier request is still waiting
+  for approval, and 0.5.0 showed that as an error with no way forward. Any setup
+  failure now points to Login Items & Extensions, where it can be fixed. Setup
+  also counts a registration that's waiting for approval as success even if macOS
+  reports an error, which Switchback ran into on macOS 27.
 - If the helper is approved but can't be reached, crossbar falls back to the sudo
   rule instead of failing.
 - After setting up the helper, the popover footer updates right away.
