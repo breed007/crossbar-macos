@@ -25,3 +25,6 @@ xcuserdata/
 
 # Claude Code (machine-local)
 .claude/settings.local.json
+
+# Generated Xcode project — Crossbar ships project.yml; run `xcodegen generate`
+Crossbar.xcodeproj/

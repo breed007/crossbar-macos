@@ -1,0 +1,94 @@
+name: Crossbar
+options:
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    MARKETING_VERSION: "0.6.0"
+    CURRENT_PROJECT_VERSION: "6"
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: "YA83Q8FTH3"   # Brian Reed — Developer ID signing/notarization
+
+targets:
+  Crossbar:
+    type: application
+    platform: macOS
+    sources:
+      - path: Crossbar
+      - path: Shared
+      # The helper's launchd plist, where SMAppService.daemon(plistName:) looks for it.
+      - path: Helper/com.breed.Crossbar.helper.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchDaemons
+    scheme:
+      testTargets:
+        - CrossbarTests
+    dependencies:
+      # The helper binary ships at Contents/MacOS/CrossbarHelper.
+      - target: CrossbarHelper
+        embed: true
+        copy:
+          destination: executables
+    settings:
+      base:
+        PRODUCT_NAME: Crossbar
+        PRODUCT_BUNDLE_IDENTIFIER: com.breed.Crossbar
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Crossbar
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_NSPrincipalClass: NSApplication
+        INFOPLIST_KEY_NSLocationUsageDescription: "Crossbar uses your location only to read the name (SSID) of the Wi-Fi network you’re connected to. macOS withholds the SSID from apps without this permission."
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Crossbar uses your location only to read the name (SSID) of the Wi-Fi network you’re connected to. macOS withholds the SSID from apps without this permission."
+        ENABLE_HARDENED_RUNTIME: YES     # required for notarization
+        CODE_SIGN_STYLE: Automatic
+        COMBINE_HIDPI_IMAGES: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_EMIT_LOC_STRINGS: YES
+    # NOTE: Crossbar is intentionally NOT sandboxed — toggling services and spawning
+    # the networksetup fallback can't run inside the App Sandbox. Distribution is
+    # GitHub + Homebrew, not the Mac App Store.
+
+  # Privileged helper: a root LaunchDaemon registered through SMAppService. Its only
+  # operation is enabling or disabling one existing service. See
+  # docs/backend-b-design.md.
+  CrossbarHelper:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Helper/main.swift
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_NAME: CrossbarHelper
+        PRODUCT_BUNDLE_IDENTIFIER: com.breed.Crossbar.helper
+        INFOPLIST_FILE: Helper/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES   # gives the tool its signing identifier
+        ENABLE_HARDENED_RUNTIME: YES
+        SKIP_INSTALL: YES
+        CODE_SIGN_STYLE: Automatic
+
+  # Unit tests. The app's sources are compiled straight into the bundle (minus its
+  # entry point, debug flags, resources, and the App Intents shell), so there's no
+  # host app (it would start the menu-bar agent) and no privileges needed.
+  CrossbarTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+      - path: Shared
+      - path: Crossbar
+        excludes:
+          - App/main.swift
+          - App/DebugCommands.swift
+          - App/Intents.swift
+          - Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.breed.Crossbar.tests
+        GENERATE_INFOPLIST_FILE: YES
