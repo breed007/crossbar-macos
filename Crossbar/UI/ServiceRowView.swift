@@ -112,7 +112,7 @@ final class ServiceRowView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     /// A spoken description of a row's full state, e.g.
-    /// "Wi-Fi, connected, active route, network MI6".
+    /// "Wi-Fi, connected, active route, network Harbor Lane".
     static func accessibilityLabel(for state: NetworkServiceState, settling: Bool = false) -> String {
         let status: String
         if settling {

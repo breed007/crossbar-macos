@@ -268,11 +268,11 @@ private enum Snapshots {
         // disabled, settling, and the keyboard highlight.
         let sample = [
             NetworkServiceState(id: "ETH", name: "Thunderbolt Ethernet Slot 0", bsdName: "en7", isEnabled: true,
-                                ipv4Address: "192.168.10.112", router: "192.168.10.1", hasActiveLink: true,
+                                ipv4Address: "10.20.30.45", router: "10.20.30.1", hasActiveLink: true,
                                 isPrimary: true, kind: .wired, ssid: nil, orderIndex: 0),
             NetworkServiceState(id: "WIFI", name: "Wi-Fi", bsdName: "en0", isEnabled: true,
-                                ipv4Address: "192.168.60.42", router: "192.168.60.1", hasActiveLink: true,
-                                isPrimary: false, kind: .wifi, ssid: "MI6", orderIndex: 2),
+                                ipv4Address: "10.20.40.12", router: "10.20.40.1", hasActiveLink: true,
+                                isPrimary: false, kind: .wifi, ssid: "Harbor Lane", orderIndex: 2),
             NetworkServiceState(id: "USB", name: "USB 10/100/1000 LAN", bsdName: "en8", isEnabled: true,
                                 ipv4Address: nil, router: nil, hasActiveLink: false,
                                 isPrimary: false, kind: .wired, ssid: nil, orderIndex: 1),

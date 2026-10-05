@@ -12,7 +12,7 @@ func makeService(_ id: String, name: String? = nil, enabled: Bool = true, router
 
 final class RoutePredictionTests: XCTestCase {
     private let ethernet = makeService("ETH", name: "Thunderbolt Ethernet", router: "10.0.0.1", primary: true, order: 0)
-    private let wifi = makeService("WIFI", name: "Wi-Fi", router: "192.168.60.1", kind: .wifi, ssid: "MI6", order: 2)
+    private let wifi = makeService("WIFI", name: "Wi-Fi", router: "10.20.40.1", kind: .wifi, ssid: "Harbor Lane", order: 2)
 
     func testDormantServiceNeedsNoWarning() {
         XCTAssertEqual(RoutePrediction.disabling("WIFI", in: [ethernet, wifi]), .notActiveRoute)
@@ -25,7 +25,7 @@ final class RoutePredictionTests: XCTestCase {
     func testActiveRouteHandsOffToTheNextConnectedService() {
         XCTAssertEqual(RoutePrediction.disabling("ETH", in: [ethernet, wifi]), .handoff(to: wifi))
         XCTAssertEqual(RoutePrediction.disabling("ETH", in: [ethernet, wifi]).sentence,
-                       "Traffic will move to Wi-Fi (MI6).")
+                       "Traffic will move to Wi-Fi (Harbor Lane).")
     }
 
     func testSuccessorFollowsServiceOrderNotListOrder() {

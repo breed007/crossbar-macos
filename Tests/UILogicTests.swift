@@ -1,7 +1,7 @@
 import XCTest
 
 final class ToggleConfirmationTests: XCTestCase {
-    private let wifi = makeService("WIFI", name: "Wi-Fi", router: "192.168.60.1", kind: .wifi, ssid: "MI6", order: 2)
+    private let wifi = makeService("WIFI", name: "Wi-Fi", router: "10.20.40.1", kind: .wifi, ssid: "Harbor Lane", order: 2)
     private let ssh = RemoteSession(kind: .ssh, host: "10.0.0.5")
 
     private func plan(_ prediction: RoutePrediction, remote: [RemoteSession] = [], confirm: Bool = true) -> ToggleConfirmation? {
@@ -17,7 +17,7 @@ final class ToggleConfirmationTests: XCTestCase {
     func testHandoffAsksAndCanBeSilenced() {
         let asked = plan(.handoff(to: wifi))
         XCTAssertEqual(asked?.title, "Turn off Thunderbolt Ethernet?")
-        XCTAssertEqual(asked?.message, "Traffic will move to Wi-Fi (MI6).")
+        XCTAssertEqual(asked?.message, "Traffic will move to Wi-Fi (Harbor Lane).")
         XCTAssertEqual(asked?.offersDontAskAgain, true)
         XCTAssertNil(plan(.handoff(to: wifi), confirm: false))
     }
@@ -30,7 +30,7 @@ final class ToggleConfirmationTests: XCTestCase {
         let asked = plan(.handoff(to: wifi), remote: [ssh], confirm: false)
         XCTAssertEqual(asked?.offersDontAskAgain, false)
         XCTAssertEqual(asked?.message,
-                       "Traffic will move to Wi-Fi (MI6). This Mac has an SSH session from 10.0.0.5, which may disconnect.")
+                       "Traffic will move to Wi-Fi (Harbor Lane). This Mac has an SSH session from 10.0.0.5, which may disconnect.")
     }
 }
 
@@ -64,8 +64,8 @@ final class SettlingTrackerTests: XCTestCase {
 
 final class MenuBarTextTests: XCTestCase {
     func testWiFiShowsTheSSID() {
-        let wifi = makeService("WIFI", name: "Wi-Fi", router: "1.1.1.1", primary: true, kind: .wifi, ssid: "MI6")
-        XCTAssertEqual(MenuBarText.networkName([wifi]), "MI6")
+        let wifi = makeService("WIFI", name: "Wi-Fi", router: "1.1.1.1", primary: true, kind: .wifi, ssid: "Harbor Lane")
+        XCTAssertEqual(MenuBarText.networkName([wifi]), "Harbor Lane")
     }
 
     func testWiredShowsTheServiceName() {

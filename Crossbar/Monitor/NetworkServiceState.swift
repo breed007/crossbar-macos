@@ -47,7 +47,7 @@ struct NetworkServiceState: Identifiable, Equatable {
     /// route when several services are connected. `Int.max` if it isn't listed.
     var orderIndex: Int = Int.max
 
-    /// The name used in messages: "Wi-Fi (MI6)" when the SSID is known.
+    /// The name used in messages: "Wi-Fi (Harbor Lane)" when the SSID is known.
     var spokenName: String {
         guard let ssid else { return name }
         return "\(name) (\(ssid))"
