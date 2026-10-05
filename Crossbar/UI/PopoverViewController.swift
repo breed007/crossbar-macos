@@ -10,6 +10,7 @@ final class PopoverViewController: NSViewController {
     /// Non-nil when the toggle is a router that can install the privileged helper
     /// — used to offer the "Set up helper" affordance and reflect its status.
     private var router: ToggleRouter? { toggle as? ToggleRouter }
+    private let helperClient = HelperClient()
     private var cancellable: AnyCancellable?
 
     /// Service names with a toggle currently in flight, so a second flip on the
@@ -181,41 +182,10 @@ final class PopoverViewController: NSViewController {
     }
 
     @objc private func setUpHelper() {
-        guard let router else { return }
-        do {
-            try router.helper.install()
-            let alert = NSAlert()
-            alert.alertStyle = .informational
-            if router.helper.requiresApproval {
-                alert.messageText = "One more step"
-                alert.informativeText = "Enable Crossbar’s background item under System "
-                    + "Settings → General → Login Items & Extensions to finish setting up "
-                    + "passwordless toggling."
-                alert.addButton(withTitle: "Open Settings")
-                alert.addButton(withTitle: "Later")
-                NSApp.activate(ignoringOtherApps: true)
-                if alert.runModal() == .alertFirstButtonReturn,
-                   let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
-                    NSWorkspace.shared.open(url)
-                }
-            } else {
-                alert.messageText = "Passwordless toggling is set up"
-                alert.informativeText = "Crossbar can now enable and disable network "
-                    + "services without the sudo rule."
-                alert.addButton(withTitle: "OK")
-                NSApp.activate(ignoringOtherApps: true)
-                alert.runModal()
-            }
-            monitor.refreshNow()   // refresh footer to reflect new status
-        } catch {
-            let alert = NSAlert()
-            alert.alertStyle = .warning
-            alert.messageText = "Couldn’t set up the helper"
-            alert.informativeText = error.localizedDescription
-            alert.addButton(withTitle: "OK")
-            NSApp.activate(ignoringOtherApps: true)
-            alert.runModal()
-        }
+        HelperSetup.run(helperClient)
+        // The service list didn't change, so the monitor's next snapshot would be
+        // deduplicated away. Rebuild directly so the footer shows the new status.
+        rebuild(with: monitor.services)
     }
 
     private func presentLoginApprovalNeeded() {
@@ -227,9 +197,8 @@ final class PopoverViewController: NSViewController {
         alert.addButton(withTitle: "Open Login Items")
         alert.addButton(withTitle: "Cancel")
         NSApp.activate(ignoringOtherApps: true)
-        if alert.runModal() == .alertFirstButtonReturn,
-           let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
-            NSWorkspace.shared.open(url)
+        if alert.runModal() == .alertFirstButtonReturn {
+                    HelperClient.openLoginItemsSettings()
         }
     }
 

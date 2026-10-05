@@ -19,7 +19,7 @@ final class StatusItemController {
     /// The privileged write path. `ToggleRouter` picks Backend B (the helper) when
     /// installed and falls back to Backend A (networksetup) otherwise — behind the
     /// `PrivilegedToggle` protocol so the UI never knows which ran.
-    private let toggleRouter = ToggleRouter()
+    private let toggleRouter = ToggleRouter.shared
 
     private var cancellable: AnyCancellable?
 
