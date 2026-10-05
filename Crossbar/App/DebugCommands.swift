@@ -13,7 +13,9 @@ import SystemConfiguration
 ///   --helper-toggle <serviceID> on|off toggle through the helper only
 ///   --toggle <serviceID> on|off        toggle through ToggleRouter (helper, else sudo)
 ///   --helper-selftest                  no-op re-assert of every service, then bad IDs
-///   --services                         print the services as the popover would list them
+///   --services                         print the services as the popover lists them
+///   --predict <serviceID>              what turning a service off would do (F3)
+///   --remote-sessions                  remote sessions that could be cut off
 ///   --login-item [on|off]              print, or set, Launch at Login
 enum DebugCommands {
     /// Returns an exit code if a debug flag was handled, or nil to launch normally.
@@ -51,9 +53,22 @@ enum DebugCommands {
             return selfTest(helper)
 
         case "--services":
-            for s in liveServices() {
-                print("\(s.enabled ? "on " : "off") \(s.name)  [\(s.id)]")
+            for s in StatusMonitor.readServices() {
+                let order = s.orderIndex == Int.max ? "-" : String(s.orderIndex)
+                print("\(s.isEnabled ? "on " : "off") \(s.isPrimary ? "*" : " ") \(s.name)  order=\(order)  "
+                      + "ip=\(s.ipv4Address ?? "-") router=\(s.router ?? "-")  [\(s.id)]")
             }
+            return 0
+
+        case "--predict":
+            guard args.count >= 3 else { print("usage: --predict <serviceID>"); return 64 }
+            let prediction = RoutePrediction.disabling(args[2], in: StatusMonitor.readServices())
+            print("\(prediction): \(prediction.sentence ?? "no warning")")
+            return 0
+
+        case "--remote-sessions":
+            let sessions = RemoteSessions.current()
+            print(RemoteSessions.warning(for: sessions) ?? "no remote sessions")
             return 0
 
         case "--login-item":
