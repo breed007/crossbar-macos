@@ -22,13 +22,16 @@ changing it requires root.** That split drives everything:
 
 - **Read layer** — `StatusMonitor` over `SCDynamicStore` (SystemConfiguration),
   fully event-driven, no polling.
-- **Write layer** — a `PrivilegedToggle` protocol whose v1 backend shells out to
-  `networksetup` via a narrowly-scoped passwordless `sudo` rule.
+- **Write layer** — a `PrivilegedToggle` protocol. `ToggleRouter` sends each
+  change to the privileged helper (an `SMAppService` daemon that writes through
+  `SCPreferences` by service ID; see [docs/backend-b-design.md](docs/backend-b-design.md))
+  when it's approved, and to `networksetup` through a narrowly-scoped `sudo` rule
+  otherwise.
 
-A feature that can't be expressed through *both* of those mechanisms — read it
-from SystemConfiguration, change it through `networksetup` — is a sign it doesn't
-belong in this app, because it would require bolting on a parallel framework and
-a second privileged path.
+A feature that can't be expressed through *both* of those layers (read it from
+SystemConfiguration, change it through the one-operation write path) is a sign it
+doesn't belong in this app, because it would mean bolting on a parallel framework
+and a second privileged path.
 
 ## Non-goals (and why)
 
@@ -85,6 +88,29 @@ The throughline: adding adjacent-but-different capabilities (Bluetooth today,
 AirDrop / Hotspot / VPN-connect / bandwidth graphs tomorrow) is exactly how a
 focused utility drifts into a bloated "network manager." crossbar says no on
 purpose.
+
+## Decisions that look like non-goals but aren't
+
+These came up as "should crossbar…?" and were answered on purpose (v0.6).
+
+- **Automation: actions, not rules.** crossbar provides Shortcuts actions and a
+  Focus filter, so other tools can flip a service. It does not own a rules engine
+  ("when I join this network, turn that off"). The user writes the rule in
+  Apple's tools; crossbar just does the one job when asked. This passes the
+  one-sentence test because it's still flipping a NIC.
+- **Notifications only for automated changes.** A change you made yourself is
+  confirmed by the switch and the menu bar flash. A change made by a Shortcut or a
+  Focus happened with nobody watching, so it posts a notification saying what
+  changed and where traffic went. crossbar never notifies about network events it
+  didn't cause (route changes, Wi-Fi drops): that would make it a monitoring app.
+- **No confirmation for automations.** The confirmation before turning off the
+  active route is for clicks, where the consequence may be a surprise. An
+  automation is a rule the user wrote, so it runs, and its notification carries the
+  consequence instead.
+- **Keyboard control without ⌘-number shortcuts.** Arrow keys and Space work in
+  the popover. Number shortcuts are deliberately left out: a mistyped ⌘3 would turn
+  off a network interface. For a global hotkey, assign a key combination to a
+  shortcut that uses Set Network Service.
 
 ## When the full detail is actually wanted
 

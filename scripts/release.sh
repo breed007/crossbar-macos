@@ -4,7 +4,7 @@
 # as both a universal .zip and a .dmg.
 #
 # Prerequisites (one-time):
-#   1. A "Developer ID Application: Brian Reed (YA83Q8FTH3)" cert in the keychain.
+#   1. A Developer ID Application cert for team YA83Q8FTH3 in the keychain.
 #   2. A stored notarytool credential profile (shared with Switchback):
 #
 #        xcrun notarytool store-credentials "switchback-notary" \
@@ -25,6 +25,13 @@ ARCHIVE="$BUILD_DIR/Crossbar.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"
 APP="$EXPORT_DIR/Crossbar.app"
 
+# The Xcode project is generated from project.yml.
+command -v xcodegen >/dev/null || { echo "xcodegen not found (brew install xcodegen)"; exit 1; }
+xcodegen generate >/dev/null
+
+echo "==> Running unit tests"
+scripts/test.sh
+
 VERSION="$(xcodebuild -project Crossbar.xcodeproj -scheme "$SCHEME" -configuration Release \
   -showBuildSettings 2>/dev/null | awk -F' = ' '/ MARKETING_VERSION =/{print $2; exit}')"
 [ -n "$VERSION" ] || { echo "could not read MARKETING_VERSION"; exit 1; }
@@ -43,6 +50,12 @@ echo "==> Exporting Developer ID-signed app"
 xcodebuild -exportArchive -archivePath "$ARCHIVE" \
   -exportPath "$EXPORT_DIR" \
   -exportOptionsPlist scripts/ExportOptions.plist
+
+echo "==> Checking the debug flags didn't ship"
+# DebugCommands can drive the root helper from Terminal; it's compiled only in Debug.
+if strings "$APP/Contents/MacOS/Crossbar" | grep -q -- "--helper-selftest"; then
+  echo "Release binary contains debug flags; refusing to ship"; exit 1
+fi
 
 echo "==> Verifying signature + hardened runtime"
 codesign --verify --deep --strict --verbose=2 "$APP"

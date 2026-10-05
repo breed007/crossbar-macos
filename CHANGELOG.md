@@ -5,6 +5,44 @@ All notable changes to crossbar are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-10-04
+
+### Fixed
+- **Set Up Passwordless Toggling now works.** On macOS 27, registering the helper
+  reports "Operation not permitted" even when it succeeded and is waiting for
+  approval, so 0.5.0 showed an error instead of the approval steps. Any setup
+  failure now points to Login Items & Extensions, where it can be fixed.
+- If the helper is approved but can't be reached, crossbar falls back to the sudo
+  rule instead of failing.
+- After setting up the helper, the popover footer updates right away.
+- A `networksetup` that hangs is stopped after 20 seconds instead of freezing the
+  row.
+
+### Added
+- **A warning before you lose your connection.** Turning off the service carrying
+  your traffic says where traffic will go, or that you'll go offline. It always asks
+  when you'd go offline or an SSH or Screen Sharing session could drop. The handoff
+  question can be turned off.
+- **"Connecting…"** on a service you just turned on, until it gets an address.
+- **Menu bar feedback:** "Wi-Fi off" next to the icon after a toggle, and an
+  optional setting to keep the active network's name there.
+- **Settings window:** Launch at Login, the menu bar name, the handoff question,
+  and the helper's status with Set Up, Open Login Items, and Remove.
+- **Keyboard control:** Up and Down choose a row, Space or Return toggles it,
+  Escape closes.
+- **Shortcuts and Focus:** Set Network Service and Get Network Service actions,
+  Spotlight and Siri phrases, and a Focus filter that turns services on and off
+  when a Focus starts. Each automated change posts a notification.
+- The "active route" label fades in on its new row when traffic moves.
+
+### Changed
+- The helper logs each change to the unified log (service ID and result, never
+  names), refuses malformed requests before logging them, and quits when idle.
+- crossbar no longer runs `networksetup` to read services. It finds the interfaces
+  System Settings hides through the I/O Registry, so refreshes are faster.
+- Settings moved out of the popover footer into the Settings window.
+- Built from `project.yml` with XcodeGen, with a unit-test suite.
+
 ## [0.5.0] — 2026-07-27
 
 ### Added
@@ -117,6 +155,7 @@ First release.
 - **Application icon** (globe + crossbar) for Finder and Get Info.
 - **Universal** build (Apple Silicon + Intel).
 
+[0.6.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.6.0
 [0.5.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.5.0
 [0.4.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.4.0
 [0.3.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.3.0
