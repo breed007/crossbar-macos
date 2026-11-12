@@ -20,7 +20,8 @@ OUT_DIR=build/screens
 APP="$OUT_DIR/Build/Products/Debug/Crossbar.app"
 BIN="$APP/Contents/MacOS/Crossbar"
 FINDER="$OUT_DIR/window-for-pid"
-OUT="docs/screenshots"
+OUT="${OUT:-docs/screenshots}"            # override to capture somewhere else
+VIEWS="${VIEWS:-popover warning settings}"   # also: popover-ask popover-update
 mkdir -p "$OUT_DIR" "$OUT"
 
 xcodegen generate >/dev/null
@@ -56,7 +57,7 @@ SWIFT
 fi
 
 failed=()
-for view in popover warning settings; do
+for view in $VIEWS; do
   for look in light dark; do
     "$BIN" --demo "$view" "$look" >"$OUT_DIR/demo-$view-$look.log" 2>&1 &
     pid=$!
@@ -76,9 +77,14 @@ for view in popover warning settings; do
       # The composited region, with room for the shadow. The backdrop covers the menu
       # bar too, so the margin above the popover is backdrop, not menu bar.
       read -r x y w h <<< "$bounds"
-      top=$([ "$view" = popover ] && echo 12 || echo 24)
+      top=24; [[ "$view" == popover* ]] && top=12
       x=$(( x - 32 )); y=$(( y - top )); w=$(( w + 64 )); h=$(( h + top + 48 ))
       screencapture -x -R "$x,$y,$w,$h" "$OUT/$view-$look.png"
+      # Under ~20 KB is the bare backdrop: the window hadn't drawn yet. Try once more.
+      if [ "$(stat -f%z "$OUT/$view-$look.png")" -lt 20000 ]; then
+        sleep 1.5
+        screencapture -x -R "$x,$y,$w,$h" "$OUT/$view-$look.png"
+      fi
       echo "captured $OUT/$view-$look.png"
     else
       echo "FAILED: no window for $view ($look); $OUT/$view-$look.png is out of date"

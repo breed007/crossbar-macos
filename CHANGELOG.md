@@ -5,6 +5,28 @@ All notable changes to crossbar are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] — unreleased
+
+### Added
+- **Update check, off until you turn it on.** The popover asks once whether to
+  check GitHub for a new crossbar once a day. When there's a newer release, the
+  popover says so; clicking it opens the release page, or shows the Homebrew
+  command if you installed with Homebrew. crossbar never downloads or installs
+  anything itself. Settings has the same switch and a Check Now button.
+- A managed `DisableUpdateCheck` preference lets IT turn update checks off.
+- The service list scrolls when it's taller than the screen, so Macs with many VPN
+  profiles can reach every row and the footer.
+
+### Fixed
+- A toggle that reaches the helper just as it quits for being idle is retried once,
+  instead of failing over to the sudo rule or showing an error.
+- Hidden-interface detection refreshes on every network change, so an adapter that
+  takes over the name of an unplugged one is listed correctly.
+
+### Changed
+- The Privacy section of the README describes the update check: what it requests,
+  what it sends, and that it's off until you say yes.
+
 ## [0.6.1] — 2026-11-12
 
 ### Fixed

@@ -54,7 +54,7 @@ state, and a switch.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/warning-dark.png">
-    <img src="docs/screenshots/warning-light.png" alt="Confirmation before turning off Ethernet: traffic will move to Wi-Fi (Harbor Lane), with Cancel and Turn Off buttons" width="324">
+    <img src="docs/screenshots/warning-light.png" alt="Confirmation before turning off Ethernet: traffic will move to Wi-Fi (Harbor Lane), with Cancel and Turn Off buttons" width="474">
   </picture>
 </p>
 
@@ -162,13 +162,26 @@ is enough to read the network name.
   remote session always asks, whatever this is set to.
 - Passwordless toggling: its status, and Set Up, Open Login Items, and Remove
   buttons.
+- Updates: check once a day, and Check Now.
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/settings-dark.png">
-    <img src="docs/screenshots/settings-light.png" alt="crossbar Settings window with General options and Passwordless Toggling status" width="484">
+    <img src="docs/screenshots/settings-light.png" alt="crossbar Settings window with General options, Passwordless Toggling status, and Updates" width="484">
   </picture>
 </p>
+
+## Updates
+
+crossbar can tell you when a new version is out. The first time you open it, the
+popover asks whether to check GitHub once a day; you can change your answer in
+Settings. When a newer release exists, the popover shows "crossbar 0.7.1 is
+available". Click it to open the release page, or, if you installed with Homebrew,
+to copy `brew upgrade --cask crossbar`. crossbar never downloads or installs
+anything itself.
+
+On managed Macs, an administrator can turn update checks off with a
+`DisableUpdateCheck` = `true` profile for `com.breed.Crossbar`.
 
 ## Shortcuts and Focus
 
@@ -210,9 +223,12 @@ and security model. Built in Swift and AppKit, with no third-party dependencies.
 
 ## Privacy
 
-- crossbar makes no network calls and has no telemetry or analytics. It only
-  reads local
-  system configuration and toggles local services.
+- crossbar has no telemetry or analytics. It reads local system configuration
+  and toggles local services.
+- Its only network request is the update check, and only if you turn it on: at
+  most once a day, a request to GitHub's API for crossbar's latest release. It
+  sends no cookies and nothing about your Mac or your networks; GitHub sees your IP
+  address, as it would for any web request. Off until you say yes.
 - Location permission, if granted, is used only to read your Wi-Fi network
   name locally. It never leaves your Mac, and crossbar requests no location updates.
 - Notifications are posted only for changes made by Shortcuts or a Focus.

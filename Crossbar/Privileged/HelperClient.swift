@@ -87,7 +87,24 @@ final class HelperClient: HelperBackend {
 
     func setEnabled(_ enabled: Bool, serviceID: String) async throws {
         guard isEnabled else { throw PrivilegedToggleError.helperNotInstalled }
+        do {
+            try await send(enabled, serviceID: serviceID)
+        } catch Interrupted.byHelperExit {
+            // The helper quits after 60 idle seconds; a request that lands as it exits
+            // is interrupted. launchd starts a fresh helper for the retry. Setting a
+            // service to the state it's already in is harmless, so retrying is safe.
+            do {
+                try await send(enabled, serviceID: serviceID)
+            } catch Interrupted.byHelperExit {
+                throw PrivilegedToggleError.helperCommunicationFailed("the connection was interrupted")
+            }
+        }
+    }
 
+    /// The connection broke after the request was sent: retry once.
+    private enum Interrupted: Error { case byHelperExit }
+
+    private func send(_ enabled: Bool, serviceID: String) async throws {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             let conn = xpc_connection_create_mach_service(HelperConstants.machServiceName, nil, 0)
 
@@ -119,6 +136,10 @@ final class HelperClient: HelperBackend {
                 defer { xpc_connection_cancel(conn) }
 
                 if xpc_get_type(reply) == XPC_TYPE_ERROR {
+                    if reply === XPC_ERROR_CONNECTION_INTERRUPTED, !timedOut.withLock({ $0 }) {
+                        cont.resume(throwing: Interrupted.byHelperExit)
+                        return
+                    }
                     let description = timedOut.withLock { $0 }
                         ? "it didn’t answer within \(Int(Self.replyTimeout)) seconds"
                         : xpc_dictionary_get_string(reply, XPC_ERROR_KEY_DESCRIPTION)

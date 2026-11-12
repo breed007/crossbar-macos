@@ -14,6 +14,7 @@ final class PopoverViewController: NSViewController {
     private let helperClient = HelperClient()
     private let preferences = Preferences()
     private var cancellable: AnyCancellable?
+    private var updateObserver: NSObjectProtocol?
 
     /// Service IDs with a toggle in flight, so a second flip on the same row before
     /// the first completes is ignored. Keyed by ID: two services can share a name.
@@ -28,6 +29,12 @@ final class PopoverViewController: NSViewController {
     private var hasRendered = false
 
     private let contentStack = NSStackView()
+    /// The service rows, in a scroll view so a long list (many VPN profiles) can't
+    /// push the popover off screen (v0.7 R2). It's exactly as tall as the rows until
+    /// they'd overflow.
+    private let rowsStack = NSStackView()
+    private let rowsScroll = NSScrollView()
+    private lazy var rowsHeight = rowsScroll.heightAnchor.constraint(equalToConstant: 0)
     private static let contentWidth: CGFloat = 280
     private static let inset: CGFloat = 12
 
@@ -57,6 +64,30 @@ final class PopoverViewController: NSViewController {
             contentStack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -Self.inset),
         ])
 
+        rowsStack.orientation = .vertical
+        rowsStack.alignment = .leading
+        rowsStack.spacing = 4
+        rowsStack.translatesAutoresizingMaskIntoConstraints = false
+        let document = FlippedView()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(rowsStack)
+        rowsScroll.documentView = document
+        rowsScroll.drawsBackground = false
+        rowsScroll.hasVerticalScroller = true
+        rowsScroll.autohidesScrollers = true
+        rowsScroll.translatesAutoresizingMaskIntoConstraints = false
+        let clip = rowsScroll.contentView
+        NSLayoutConstraint.activate([
+            document.leadingAnchor.constraint(equalTo: clip.leadingAnchor),
+            document.topAnchor.constraint(equalTo: clip.topAnchor),
+            document.widthAnchor.constraint(equalTo: clip.widthAnchor),
+            rowsStack.leadingAnchor.constraint(equalTo: document.leadingAnchor),
+            rowsStack.trailingAnchor.constraint(equalTo: document.trailingAnchor),
+            rowsStack.topAnchor.constraint(equalTo: document.topAnchor),
+            rowsStack.bottomAnchor.constraint(equalTo: document.bottomAnchor),
+            rowsHeight,
+        ])
+
         view = container
     }
 
@@ -69,6 +100,13 @@ final class PopoverViewController: NSViewController {
             .removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] in self?.rebuild(with: $0) }
+        updateObserver = NotificationCenter.default.addObserver(
+            forName: .crossbarUpdateStateChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.rebuild(with: self.monitor.services)
+            }
+        }
     }
 
     /// Called just before the popover opens: clear the keyboard selection and
@@ -98,11 +136,18 @@ final class PopoverViewController: NSViewController {
         title.textColor = .secondaryLabelColor
         contentStack.addArrangedSubview(title)
 
+        rowsStack.arrangedSubviews.forEach {
+            rowsStack.removeArrangedSubview($0)
+            $0.removeFromSuperview()
+        }
+        contentStack.addArrangedSubview(rowsScroll)
+        rowsScroll.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+
         if services.isEmpty {
             let empty = NSTextField(labelWithString: "No network services found")
             empty.font = .systemFont(ofSize: 13)
             empty.textColor = .tertiaryLabelColor
-            contentStack.addArrangedSubview(empty)
+            rowsStack.addArrangedSubview(empty)
         }
         for service in services {
             let row = ServiceRowView(state: service, settling: settling.isSettling(service.id)) { [weak self] desiredEnabled, row in
@@ -111,8 +156,8 @@ final class PopoverViewController: NSViewController {
             // A row whose toggle is mid-flight stays disabled until it lands.
             row.setToggleEnabled(!inFlight.contains(service.id))
             row.isHighlighted = service.id == highlightedID
-            contentStack.addArrangedSubview(row)
-            row.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+            rowsStack.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: rowsStack.widthAnchor).isActive = true
             rows.append(row)
         }
         if highlightedID != nil, !services.contains(where: { $0.id == highlightedID }) { highlightedID = nil }
@@ -127,6 +172,12 @@ final class PopoverViewController: NSViewController {
 
         addFooter()
 
+        // The rows scroll once they'd make the popover taller than the screen allows,
+        // leaving room for the title, footer, and menu bar.
+        rowsStack.layoutSubtreeIfNeeded()
+        let available = (view.window?.screen ?? NSScreen.main)?.visibleFrame.height ?? 800
+        rowsHeight.constant = min(rowsStack.fittingSize.height, max(available - 200, 160))
+
         // Size the popover to fit the current contents.
         view.layoutSubtreeIfNeeded()
         preferredContentSize = NSSize(width: Self.contentWidth, height: view.fittingSize.height)
@@ -140,6 +191,8 @@ final class PopoverViewController: NSViewController {
         separator.translatesAutoresizingMaskIntoConstraints = false
         contentStack.addArrangedSubview(separator)
         separator.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+
+        addUpdateRows()
 
         if !helperClient.isEnabled {
             let setup = makeFooterButton(title: "Set Up Passwordless Toggling…", action: #selector(setUpHelper))
@@ -159,6 +212,42 @@ final class PopoverViewController: NSViewController {
         footer.spacing = 10
         contentStack.addArrangedSubview(footer)
         footer.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+    }
+
+    /// The one-time update question until it's answered, then "crossbar 0.7.1 is
+    /// available" while a newer release is known (v0.7 U1, U2).
+    private func addUpdateRows() {
+        let updates = UpdateChecker.shared
+        if updates.shouldAsk {
+            let question = NSTextField(wrappingLabelWithString: "Check GitHub for crossbar updates once a day?")
+            question.font = .systemFont(ofSize: 11)
+            question.textColor = .secondaryLabelColor
+            question.preferredMaxLayoutWidth = Self.contentWidth - 2 * Self.inset
+            let turnOn = makeFooterButton(title: "Turn On", action: #selector(turnOnUpdateChecks))
+            turnOn.contentTintColor = .controlAccentColor
+            let buttons = NSStackView(views: [turnOn, makeFooterButton(title: "No Thanks",
+                                                                         action: #selector(declineUpdateChecks))])
+            buttons.spacing = 10
+            let ask = NSStackView(views: [question, buttons])
+            ask.orientation = .vertical
+            ask.alignment = .leading
+            ask.spacing = 2
+            contentStack.addArrangedSubview(ask)
+        } else if let release = updates.available {
+            let line = makeFooterButton(title: "\(UpdateCheck.product.displayName) \(release.version) is available",
+                                        action: #selector(showUpdate))
+            line.contentTintColor = .controlAccentColor
+            contentStack.addArrangedSubview(line)
+        }
+    }
+
+    @objc private func turnOnUpdateChecks() { UpdateChecker.shared.setAutomatic(true) }
+    @objc private func declineUpdateChecks() { UpdateChecker.shared.setAutomatic(false) }
+
+    @objc private func showUpdate() {
+        guard let release = UpdateChecker.shared.available else { return }
+        onClose?()
+        UpdateChecker.present(release)
     }
 
     private func makeFooterButton(title: String, action: Selector) -> NSButton {
@@ -200,6 +289,7 @@ final class PopoverViewController: NSViewController {
         }
         highlightedID = rows[next].serviceID
         for row in rows { row.isHighlighted = row.serviceID == highlightedID }
+        rows[next].scrollToVisible(rows[next].bounds)
     }
 
     // MARK: - Toggling
@@ -332,4 +422,9 @@ final class KeyHandlingView: NSView {
     override func keyDown(with event: NSEvent) {
         if onKeyDown?(event) != true { super.keyDown(with: event) }
     }
+}
+
+/// Top-to-bottom coordinates, so a scroll view starts at its first row.
+private final class FlippedView: NSView {
+    override var isFlipped: Bool { true }
 }

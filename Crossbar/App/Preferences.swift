@@ -13,6 +13,10 @@ extension Notification.Name {
 struct Preferences {
     static let showNetworkNameKey = "ShowNetworkNameInMenuBar"
     static let confirmRouteHandoffKey = "ConfirmRouteHandoff"
+    static let checkForUpdatesKey = "CheckForUpdates"
+    static let lastUpdateCheckKey = "LastUpdateCheck"
+    static let latestVersionKey = "LatestKnownVersion"
+    static let latestURLKey = "LatestKnownReleaseURL"
 
     let defaults: UserDefaults
 
@@ -36,6 +40,33 @@ struct Preferences {
     var confirmRouteHandoff: Bool {
         get { defaults.bool(forKey: Self.confirmRouteHandoffKey) }
         nonmutating set { set(newValue, Self.confirmRouteHandoffKey) }
+    }
+
+    /// Check GitHub for a newer release once a day (v0.7 U1). Nil until the user
+    /// answers the popover's one-time question; the check never runs while nil.
+    var checkForUpdates: Bool? {
+        get { defaults.object(forKey: Self.checkForUpdatesKey) as? Bool }
+        nonmutating set { defaults.set(newValue, forKey: Self.checkForUpdatesKey) }
+    }
+
+    /// When the last update check was attempted, whether or not it got an answer.
+    var lastUpdateCheck: Date? {
+        get { defaults.object(forKey: Self.lastUpdateCheckKey) as? Date }
+        nonmutating set { defaults.set(newValue, forKey: Self.lastUpdateCheckKey) }
+    }
+
+    /// The newest release the last successful check found, so the popover line
+    /// survives a relaunch.
+    var latestKnownRelease: (version: String, url: String)? {
+        get {
+            guard let version = defaults.string(forKey: Self.latestVersionKey),
+                  let url = defaults.string(forKey: Self.latestURLKey) else { return nil }
+            return (version, url)
+        }
+        nonmutating set {
+            defaults.set(newValue?.version, forKey: Self.latestVersionKey)
+            defaults.set(newValue?.url, forKey: Self.latestURLKey)
+        }
     }
 
     private func set(_ value: Bool, _ key: String) {
