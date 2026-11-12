@@ -59,6 +59,8 @@ enum PrivilegedToggleError: LocalizedError, Equatable {
         switch code {
         case HelperConstants.ErrorCode.unknownServiceID: return "that service no longer exists"
         case HelperConstants.ErrorCode.missingServiceID: return "no service was named"
+        case HelperConstants.ErrorCode.missingEnabled: return "the request didn’t say on or off"
+        case HelperConstants.ErrorCode.setEnabledFailed: return "macOS refused to turn the service on or off"
         case HelperConstants.ErrorCode.unknownOp: return "the helper is older than this app; reinstall it from Settings"
         case HelperConstants.ErrorCode.commitFailed,
              HelperConstants.ErrorCode.applyFailed: return "macOS refused to save the change"

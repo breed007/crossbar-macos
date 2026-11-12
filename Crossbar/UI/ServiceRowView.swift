@@ -106,7 +106,9 @@ final class ServiceRowView: NSView {
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         setAccessibilityLabel(Self.accessibilityLabel(for: state, settling: settling))
-        toggleSwitch.setAccessibilityLabel("\(state.name), \(state.isEnabled ? "on" : "off")")
+        // The switch speaks its own on/off value, which stays right after a click
+        // flips it; a value baked into the label would go stale.
+        toggleSwitch.setAccessibilityLabel(state.name)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

@@ -62,7 +62,7 @@ non-goals), and `docs/backend-b-design.md` before touching the helper.
   the popover material. A popover anchored to the menu bar takes the system's
   appearance, not the app's, so demo mode sets `popover.appearance` explicitly. The
   NSAlert's backdrop sits just below `.modalPanel`, everything else just below
-  `.popUpMenu`. Bounds are re-read after the popover finishes animating open.
+  `.popUpMenu`. The script waits until a window's bounds read the same twice in a row.
 - The App Intents file is excluded from the test bundle, or the test process
   registers App Shortcuts with the system (learned in Switchback).
 

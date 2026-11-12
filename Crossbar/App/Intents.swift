@@ -147,8 +147,8 @@ struct CrossbarFocusFilter: SetFocusFilterIntent {
     }
 
     func perform() async throws -> some IntentResult {
-        let changes = (turnOn ?? []).map { AutomationToggle.Change(serviceID: $0.id, enabled: true) }
-            + (turnOff ?? []).map { AutomationToggle.Change(serviceID: $0.id, enabled: false) }
+        let changes = (turnOn ?? []).map { AutomationToggle.Change(serviceID: $0.id, enabled: true, name: $0.name) }
+            + (turnOff ?? []).map { AutomationToggle.Change(serviceID: $0.id, enabled: false, name: $0.name) }
         guard !changes.isEmpty else {
             automationLog.notice("focus filter ran with nothing chosen (Focus ended, or none set): no change")
             return .result()

@@ -74,16 +74,19 @@ final class NetworksetupToggle: PrivilegedToggle {
         let stderrText = String(data: stderrData, encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
-        guard process.terminationStatus == 0 else {
-            // `sudo -n` prints these when it would have needed to prompt — i.e.
-            // the NOPASSWD rule for this exact command isn't in place.
-            if stderrText.localizedCaseInsensitiveContains("password is required")
-                || stderrText.localizedCaseInsensitiveContains("a terminal is required") {
-                throw PrivilegedToggleError.sudoRuleMissing
-            }
-            throw PrivilegedToggleError.commandFailed(
-                status: process.terminationStatus, message: stderrText)
+        if let error = failure(status: process.terminationStatus, stderr: stderrText) { throw error }
+    }
+
+    /// What a finished `sudo -n networksetup` run means. Pure, so it's tested.
+    static func failure(status: Int32, stderr: String) -> PrivilegedToggleError? {
+        guard status != 0 else { return nil }
+        // `sudo -n` prints these when it would have needed to prompt — i.e.
+        // the NOPASSWD rule for this exact command isn't in place.
+        if stderr.localizedCaseInsensitiveContains("password is required")
+            || stderr.localizedCaseInsensitiveContains("a terminal is required") {
+            return .sudoRuleMissing
         }
+        return .commandFailed(status: status, message: stderr)
     }
 }
 

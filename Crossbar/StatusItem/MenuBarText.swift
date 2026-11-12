@@ -8,8 +8,9 @@ enum MenuBarText {
     /// service name. Nil when nothing does (the icon's alert badge covers that).
     static func networkName(_ services: [NetworkServiceState]) -> String? {
         guard let active = services.first(where: \.isPrimary) else { return nil }
-        let name = (active.kind == .wifi ? active.ssid : nil) ?? active.name
-        return truncate(name)
+        // A blank SSID (all spaces) falls back to the service name.
+        let ssid = active.kind == .wifi ? active.ssid.map(truncate) : nil
+        return ssid.flatMap { $0.isEmpty ? nil : $0 } ?? truncate(active.name)
     }
 
     /// The flash after a toggle, e.g. "Wi-Fi off".

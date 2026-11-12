@@ -5,6 +5,45 @@ All notable changes to crossbar are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] — 2026-11-12
+
+### Fixed
+- A Focus that swaps one service for another now waits for the new service to
+  connect (up to 15 seconds) before turning the old one off. Before, it turned the
+  old one off right away, so you could be briefly offline, and the notification
+  said you'd go offline.
+- With a full-tunnel VPN connected, turning off the network the VPN runs over now
+  asks first, like turning off any service carrying your traffic. A VPN is no
+  longer offered as the place traffic will move to, since it needs a network
+  underneath it.
+- A switch could stay grayed out after a toggle if the network changed while the
+  toggle was in progress.
+- A call to the helper now gives up after 20 seconds and then tries the `sudo`
+  fallback, which has its own 20-second limit. Before, a stuck helper left the
+  switch frozen and a shortcut waiting forever.
+- A Focus filter announces the changes it made even when a later change fails, and
+  says so when it names a service that no longer exists.
+- A Focus that turns off every connected service at once now says you'll go
+  offline, instead of naming one of them as where traffic will move.
+- Holding Space on a row no longer turns the service on and then off again.
+- A Wi-Fi network name made only of spaces no longer leaves the menu bar text blank.
+- VoiceOver no longer reads a stale on/off state for a switch you just clicked.
+- The helper's "macOS refused to turn the service on or off" error is shown in
+  plain words instead of its internal code.
+
+### Security
+- The helper refuses a connection if it can't attach its check on the caller's
+  signature, and crossbar refuses to talk to a helper whose signature it can't
+  check. Neither has been seen to fail.
+- The helper refuses a request that doesn't say on or off, instead of reading it as
+  off.
+- Login and process names are read within their fixed-size buffers.
+
+### Changed
+- The README has uninstall steps.
+- The release script stops if Gatekeeper rejects the app, and its check that debug
+  commands didn't ship can no longer miss them.
+
 ## [0.6.0] — 2026-10-04
 
 ### Fixed
@@ -157,6 +196,7 @@ First release.
 - **Application icon** (globe + crossbar) for Finder and Get Info.
 - **Universal** build (Apple Silicon + Intel).
 
+[0.6.1]: https://github.com/breed007/crossbar-macos/releases/tag/v0.6.1
 [0.6.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.6.0
 [0.5.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.5.0
 [0.4.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.4.0

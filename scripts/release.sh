@@ -8,7 +8,7 @@
 #   2. A stored notarytool credential profile (shared with Switchback):
 #
 #        xcrun notarytool store-credentials "switchback-notary" \
-#          --apple-id "breed007@gmail.com" --team-id YA83Q8FTH3
+#          --apple-id "<your Apple ID email>" --team-id YA83Q8FTH3
 #
 # Usage:
 #   scripts/release.sh                        # profile "switchback-notary"
@@ -53,7 +53,11 @@ xcodebuild -exportArchive -archivePath "$ARCHIVE" \
 
 echo "==> Checking the debug flags didn't ship"
 # DebugCommands can drive the root helper from Terminal; it's compiled only in Debug.
-if strings "$APP/Contents/MacOS/Crossbar" | grep -q -- "--helper-selftest"; then
+# Not `strings | grep -q`: with pipefail, grep exiting at the first match kills
+# strings with SIGPIPE, and the failed pipeline reads as "not found". And check the
+# binary exists, since a failure inside <(...) would also read as "not found".
+[ -f "$APP/Contents/MacOS/Crossbar" ] || { echo "No binary at $APP; refusing to ship"; exit 1; }
+if grep -q -- "--helper-selftest" <(strings "$APP/Contents/MacOS/Crossbar"); then
   echo "Release binary contains debug flags; refusing to ship"; exit 1
 fi
 
@@ -71,6 +75,10 @@ echo "==> Stapling the app"
 xcrun stapler staple "$APP"
 xcrun stapler validate "$APP"
 
+echo "==> Gatekeeper assessment"
+# Fatal, and before packaging, so a rejected app never reaches dist/.
+spctl -a -vv -t exec "$APP"
+
 echo "==> Packaging $ZIP (stapled app)"
 ditto -c -k --keepParent "$APP" "$ZIP"
 
@@ -85,7 +93,9 @@ hdiutil create -volname "Crossbar" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov
 echo "==> Notarizing + stapling the dmg"
 xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
 xcrun stapler staple "$DMG"
-spctl -a -vv "$APP" || true
+
+# The dmg isn't code-signed, so spctl can't assess it; check its ticket instead.
+xcrun stapler validate "$DMG"
 
 echo "==> Done:"
 echo "    $ZIP"

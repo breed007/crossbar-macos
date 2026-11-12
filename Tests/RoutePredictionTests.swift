@@ -42,6 +42,29 @@ final class RoutePredictionTests: XCTestCase {
                        "Nothing else is connected, so you’ll go offline.")
     }
 
+    func testTheLinkUnderAFullTunnelVPNCarriesTraffic() {
+        let vpn = makeService("VPN", name: "Corp VPN", router: "10.8.0.1", primary: true, kind: .vpn, order: 3)
+        let wifiUnderVPN = makeService("WIFI", name: "Wi-Fi", router: "10.20.40.1", kind: .wifi, order: 2)
+        let usb = makeService("USB", name: "USB Ethernet", router: "10.1.0.1", order: 4)
+        XCTAssertEqual(RoutePrediction.disabling("WIFI", in: [wifiUnderVPN, vpn]), .offline,
+                       "turning off the VPN's only link takes everything down")
+        XCTAssertEqual(RoutePrediction.disabling("WIFI", in: [wifiUnderVPN, vpn, usb]), .handoff(to: usb))
+        XCTAssertEqual(RoutePrediction.disabling("USB", in: [wifiUnderVPN, vpn, usb]), .notActiveRoute,
+                       "a second link isn't what the VPN runs over")
+        XCTAssertEqual(RoutePrediction.disabling("VPN", in: [wifiUnderVPN, vpn]), .handoff(to: wifiUnderVPN))
+    }
+
+    func testAVPNIsNeverASuccessor() {
+        let splitVPN = makeService("VPN", name: "Corp VPN", router: "10.8.0.1", kind: .vpn, order: 1)
+        XCTAssertEqual(RoutePrediction.disabling("ETH", in: [ethernet, splitVPN]), .offline)
+    }
+
+    func testOrderIndexAtTheEndOfTheRangeStillSorts() {
+        let unordered = makeService("NEW", name: "New Adapter", router: "10.3.0.1", ip: "10.3.0.5", order: Int.max)
+        XCTAssertEqual(RoutePrediction.disabling("ETH", in: [ethernet, unordered, wifi]), .handoff(to: wifi))
+        XCTAssertEqual(RoutePrediction.disabling("ETH", in: [ethernet, unordered]), .handoff(to: unordered))
+    }
+
     func testRemoteSessionsFromLoginRecordsAndProcesses() {
         let sessions = RemoteSessions.summarize(loginHosts: ["", "10.0.0.5", "10.0.0.5"],
                                                 processNames: ["launchd", "screensharingd"])

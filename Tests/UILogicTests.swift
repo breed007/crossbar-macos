@@ -104,3 +104,17 @@ final class PreferencesTests: XCTestCase {
         XCTAssertTrue(Preferences(defaults).showNetworkName)
     }
 }
+
+final class SmallFixesTests: XCTestCase {
+    func testABlankSSIDFallsBackToTheServiceName() {
+        let wifi = makeService("WIFI", name: "Wi-Fi", router: "1.1.1.1", primary: true, kind: .wifi, ssid: "   ")
+        XCTAssertEqual(MenuBarText.networkName([wifi]), "Wi-Fi")
+    }
+
+    func testFixedBuffersStopAtTheirEndWithoutANul() {
+        let full: (CChar, CChar, CChar, CChar) = (0x68, 0x6F, 0x73, 0x74)   // "host", no NUL
+        XCTAssertEqual(RemoteSessions.string(fromFixedBuffer: full), "host")
+        let short: (CChar, CChar, CChar, CChar) = (0x61, 0, 0x62, 0)
+        XCTAssertEqual(RemoteSessions.string(fromFixedBuffer: short), "a")
+    }
+}

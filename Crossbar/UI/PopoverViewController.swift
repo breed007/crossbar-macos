@@ -176,6 +176,8 @@ final class PopoverViewController: NSViewController {
     /// Up and Down move the highlight; Space or Return toggles the highlighted
     /// service through the same checks as a click; Escape closes the popover.
     private func handleKey(_ event: NSEvent) -> Bool {
+        // Holding Space would otherwise flip a row on and then off again.
+        if event.isARepeat, [49, 36, 76].contains(event.keyCode) { return true }
         switch event.keyCode {
         case 125: moveHighlight(by: 1); return true      // down arrow
         case 126: moveHighlight(by: -1); return true     // up arrow
@@ -237,18 +239,19 @@ final class PopoverViewController: NSViewController {
             defer {
                 self.inFlight.remove(serviceID)
                 if succeeded {
-                    // The system state changed, so refreshNow() publishes a different
-                    // snapshot and rebuild() replaces this row with a fresh one.
                     if enable { self.scheduleSettling(serviceID) }
-                    self.monitor.refreshNow()
                     NotificationCenter.default.post(name: .crossbarServiceToggled, object: nil,
                                                     userInfo: ["name": service.name, "enabled": enable])
-                } else {
-                    // FAILURE: the model is unchanged, so refreshNow() would publish an
-                    // equal snapshot that removeDuplicates() drops. No rebuild would
-                    // land and the frozen row would stay stuck, so restore it here.
-                    row.setToggleOn(service.isEnabled)
-                    row.setToggleEnabled(true)
+                }
+                self.monitor.refreshNow()
+                // Unfreeze the row that's on screen now, not the one clicked: a snapshot
+                // that landed mid-toggle rebuilt the list with this row disabled, and
+                // the snapshot refreshNow() publishes may equal it, so removeDuplicates()
+                // drops it and no rebuild would come. On failure, put the switch back.
+                if let current = self.rows.first(where: { $0.serviceID == serviceID }) {
+                    let live = self.monitor.services.first { $0.id == serviceID }
+                    current.setToggleOn(live?.isEnabled ?? service.isEnabled)
+                    current.setToggleEnabled(true)
                 }
             }
             do {

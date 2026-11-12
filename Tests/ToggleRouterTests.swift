@@ -60,6 +60,33 @@ final class ToggleRouterTests: XCTestCase {
         XCTAssertEqual(fallback.calls.count, 1)
     }
 
+    func testHelperThatDisappearedFallsBackToBackendA() async {
+        let helper = FakeHelper(enabled: true, result: .failure(PrivilegedToggleError.helperNotInstalled))
+        let fallback = FakeFallback()
+        let error = await run(ToggleRouter(helper: helper, fallback: fallback))
+        XCTAssertNil(error)
+        XCTAssertEqual(fallback.calls.map(\.2), ["Wi-Fi"])
+    }
+
+    func testSudoOutputIsClassified() {
+        XCTAssertNil(NetworksetupToggle.failure(status: 0, stderr: "anything"))
+        XCTAssertEqual(NetworksetupToggle.failure(status: 1, stderr: "sudo: a password is required"), .sudoRuleMissing)
+        XCTAssertEqual(NetworksetupToggle.failure(status: 1, stderr: "sudo: A terminal is required to read the password"),
+                       .sudoRuleMissing)
+        XCTAssertEqual(NetworksetupToggle.failure(status: 4, stderr: "** Error: The parameters were not valid."),
+                       .commandFailed(status: 4, message: "** Error: The parameters were not valid."))
+    }
+
+    func testEveryHelperErrorCodeHasPlainWords() {
+        let codes = [HelperConstants.ErrorCode.unknownOp, HelperConstants.ErrorCode.missingServiceID,
+                     HelperConstants.ErrorCode.missingEnabled, HelperConstants.ErrorCode.unknownServiceID,
+                     HelperConstants.ErrorCode.openPrefsFailed, HelperConstants.ErrorCode.setEnabledFailed,
+                     HelperConstants.ErrorCode.commitFailed, HelperConstants.ErrorCode.applyFailed]
+        for code in codes {
+            XCTAssertNotEqual(PrivilegedToggleError.describe(code), code, "\(code) is shown raw")
+        }
+    }
+
     func testHelperReportedFailureIsNotRetried() async {
         let code = HelperConstants.ErrorCode.commitFailed
         let helper = FakeHelper(enabled: true, result: .failure(PrivilegedToggleError.helperReportedError(code)))

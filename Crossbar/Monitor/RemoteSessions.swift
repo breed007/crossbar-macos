@@ -50,12 +50,16 @@ enum RemoteSessions {
         setutxent(); defer { endutxent() }
         while let entry = getutxent() {
             guard entry.pointee.ut_type == USER_PROCESS else { continue }
-            var host = entry.pointee.ut_host
-            hosts.append(withUnsafeBytes(of: &host) {
-                String(cString: $0.bindMemory(to: CChar.self).baseAddress!)
-            })
+            hosts.append(string(fromFixedBuffer: entry.pointee.ut_host))
         }
         return hosts
+    }
+
+    /// A C string stored in a fixed-size array (a tuple in Swift). Stops at the first
+    /// NUL or the end of the array, whichever comes first: a host name that fills
+    /// `ut_host` has no terminating NUL, and `String(cString:)` would read past it.
+    static func string<Buffer>(fromFixedBuffer buffer: Buffer) -> String {
+        withUnsafeBytes(of: buffer) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
     }
 
     /// Names of every running process. Uses the `KERN_PROC` sysctl, which, unlike
@@ -70,10 +74,7 @@ enum RemoteSessions {
         guard sysctl(&mib, UInt32(mib.count), &procs, &size, nil, 0) == 0 else { return [] }
         var names = Set<String>()
         for index in 0..<(size / MemoryLayout<kinfo_proc>.stride) {
-            var comm = procs[index].kp_proc.p_comm
-            names.insert(withUnsafeBytes(of: &comm) {
-                String(cString: $0.bindMemory(to: CChar.self).baseAddress!)
-            })
+            names.insert(string(fromFixedBuffer: procs[index].kp_proc.p_comm))
         }
         return names
     }
