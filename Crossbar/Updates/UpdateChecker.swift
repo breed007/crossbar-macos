@@ -111,12 +111,19 @@ final class UpdateChecker {
     }
 
     /// One GET with nothing about the Mac in it: an ephemeral session (no cookies,
-    /// no cache) and a fixed User-Agent.
-    nonisolated static func liveFetch(_ url: URL) async throws -> Data {
+    /// no cache) and fixed headers. URLSession would otherwise add the user's
+    /// languages as Accept-Language and its own User-Agent naming the OS version.
+    nonisolated static func request(for url: URL) -> URLRequest {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
         request.httpShouldHandleCookies = false
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("Crossbar", forHTTPHeaderField: "User-Agent")
+        request.setValue("en", forHTTPHeaderField: "Accept-Language")
+        return request
+    }
+
+    nonisolated static func liveFetch(_ url: URL) async throws -> Data {
+        let request = request(for: url)
         let session = URLSession(configuration: .ephemeral)
         defer { session.finishTasksAndInvalidate() }
         let (data, response) = try await session.data(for: request)
