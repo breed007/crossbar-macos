@@ -69,7 +69,14 @@ private func handle(_ message: xpc_object_t, from peer: xpc_connection_t) {
         log.error("uid \(uid, privacy: .public): refused a malformed service ID")
         return send(HelperConstants.ErrorCode.unknownServiceID)
     }
-    let enabled = xpc_dictionary_get_bool(message, HelperConstants.Key.enabled)
+    // xpc_dictionary_get_bool reads a missing key as false, which would turn the
+    // service off. Require a real bool.
+    guard let value = xpc_dictionary_get_value(message, HelperConstants.Key.enabled),
+          xpc_get_type(value) == XPC_TYPE_BOOL else {
+        log.error("uid \(uid, privacy: .public): request had no on/off value")
+        return send(HelperConstants.ErrorCode.missingEnabled)
+    }
+    let enabled = xpc_bool_get_value(value)
 
     // Service IDs are opaque GUIDs and logged in the clear; service names (which
     // can name a client's VPN) are never logged.
@@ -88,8 +95,13 @@ xpc_connection_set_event_handler(listener) { peer in
     guard xpc_get_type(peer) == XPC_TYPE_CONNECTION else { return }
 
     // Pin the caller. The OS enforces this per message; anything failing the
-    // requirement never reaches `handle`.
-    _ = xpc_connection_set_peer_code_signing_requirement(peer, HelperConstants.clientRequirement)
+    // requirement never reaches `handle`. If the pin can't be set, refuse the
+    // connection rather than serve an unchecked caller.
+    guard xpc_connection_set_peer_code_signing_requirement(peer, HelperConstants.clientRequirement) == 0 else {
+        log.error("couldn't set the caller requirement; refused a connection")
+        xpc_connection_cancel(peer)
+        return
+    }
     xpc_connection_set_target_queue(peer, workQueue)
 
     xpc_connection_set_event_handler(peer) { event in

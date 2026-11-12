@@ -55,6 +55,7 @@ SWIFT
   swiftc -O "$OUT_DIR/window-for-pid.swift" -o "$FINDER"
 fi
 
+failed=()
 for view in popover warning settings; do
   for look in light dark; do
     "$BIN" --demo "$view" "$look" >"$OUT_DIR/demo-$view-$look.log" 2>&1 &
@@ -80,9 +81,15 @@ for view in popover warning settings; do
       screencapture -x -R "$x,$y,$w,$h" "$OUT/$view-$look.png"
       echo "captured $OUT/$view-$look.png"
     else
-      echo "FAILED: no window for $view ($look)"
+      echo "FAILED: no window for $view ($look); $OUT/$view-$look.png is out of date"
+      failed+=("$view-$look")
     fi
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
   done
 done
+
+if [ ${#failed[@]} -gt 0 ]; then
+  echo "Not captured: ${failed[*]}"
+  exit 1
+fi

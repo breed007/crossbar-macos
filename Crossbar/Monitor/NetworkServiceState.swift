@@ -67,3 +67,12 @@ struct NetworkServiceState: Identifiable, Equatable {
         return isPrimary ? "Enabled & routing" : "Enabled & dormant"
     }
 }
+
+extension NetworkServiceState {
+    /// The popover's order: by category (wired → Wi-Fi → VPN → bridges → other),
+    /// then by the configured service order within a category, then by name.
+    static func displaysBefore(_ a: NetworkServiceState, _ b: NetworkServiceState) -> Bool {
+        if a.kind.sortRank != b.kind.sortRank { return a.kind.sortRank < b.kind.sortRank }
+        return a.orderIndex != b.orderIndex ? a.orderIndex < b.orderIndex : a.name < b.name
+    }
+}

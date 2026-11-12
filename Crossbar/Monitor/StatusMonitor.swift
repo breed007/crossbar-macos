@@ -185,12 +185,7 @@ final class StatusMonitor: ObservableObject {
             ))
         }
 
-        // Prioritize by category (wired → Wi-Fi → VPN → bridges → other), then
-        // by the configured service order within a category, then by name.
-        result.sort { a, b in
-            if a.kind.sortRank != b.kind.sortRank { return a.kind.sortRank < b.kind.sortRank }
-            return a.orderIndex != b.orderIndex ? a.orderIndex < b.orderIndex : a.name < b.name
-        }
+        result.sort(by: NetworkServiceState.displaysBefore)
         return result
     }
 

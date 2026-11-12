@@ -1,4 +1,5 @@
 import Foundation
+import os
 import ServiceManagement
 @preconcurrency import XPC
 
@@ -81,6 +82,9 @@ final class HelperClient: HelperBackend {
         SMAppService.openSystemSettingsLoginItems()
     }
 
+    /// Matches `NetworksetupToggle`'s watchdog.
+    static let replyTimeout: TimeInterval = 20
+
     func setEnabled(_ enabled: Bool, serviceID: String) async throws {
         guard isEnabled else { throw PrivilegedToggleError.helperNotInstalled }
 
@@ -88,10 +92,23 @@ final class HelperClient: HelperBackend {
             let conn = xpc_connection_create_mach_service(HelperConstants.machServiceName, nil, 0)
 
             // Defense in depth: pin the helper's signature too.
-            _ = xpc_connection_set_peer_code_signing_requirement(conn, HelperConstants.helperRequirement)
+            guard xpc_connection_set_peer_code_signing_requirement(conn, HelperConstants.helperRequirement) == 0 else {
+                xpc_connection_cancel(conn)
+                cont.resume(throwing: PrivilegedToggleError.helperCommunicationFailed("couldn’t check the helper’s signature"))
+                return
+            }
 
             xpc_connection_set_event_handler(conn) { _ in }   // required before resume
             xpc_connection_resume(conn)
+
+            // A helper that never answers would leave the row frozen and a Shortcut
+            // hanging. Canceling the connection makes XPC call the reply handler with
+            // an error, which the router treats as unreachable and falls back to sudo.
+            let timedOut = OSAllocatedUnfairLock(initialState: false)
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.replyTimeout) {
+                timedOut.withLock { $0 = true }
+                xpc_connection_cancel(conn)
+            }
 
             let msg = xpc_dictionary_create(nil, nil, 0)
             xpc_dictionary_set_string(msg, HelperConstants.Key.op, HelperConstants.opSetEnabled)
@@ -102,8 +119,10 @@ final class HelperClient: HelperBackend {
                 defer { xpc_connection_cancel(conn) }
 
                 if xpc_get_type(reply) == XPC_TYPE_ERROR {
-                    let description = xpc_dictionary_get_string(reply, XPC_ERROR_KEY_DESCRIPTION)
-                        .map { String(cString: $0) } ?? "connection error"
+                    let description = timedOut.withLock { $0 }
+                        ? "it didn’t answer within \(Int(Self.replyTimeout)) seconds"
+                        : xpc_dictionary_get_string(reply, XPC_ERROR_KEY_DESCRIPTION)
+                            .map { String(cString: $0) } ?? "connection error"
                     cont.resume(throwing: PrivilegedToggleError.helperCommunicationFailed(description))
                     return
                 }

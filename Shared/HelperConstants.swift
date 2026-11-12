@@ -57,6 +57,7 @@ enum HelperConstants {
     enum ErrorCode {
         static let unknownOp = "unsupported-op"
         static let missingServiceID = "missing-service-id"
+        static let missingEnabled = "missing-enabled"
         static let unknownServiceID = "unknown-service-id"
         static let openPrefsFailed = "open-prefs-failed"
         static let setEnabledFailed = "set-enabled-failed"

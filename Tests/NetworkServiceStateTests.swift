@@ -24,6 +24,16 @@ final class NetworkServiceStateTests: XCTestCase {
         XCTAssertEqual(service().routeState, "Enabled & dormant")
     }
 
+    func testDisplayOrderIsCategoryThenServiceOrderThenName() {
+        let vpn = makeService("VPN", name: "Corp VPN", kind: .vpn, order: 0)
+        let wifi = makeService("WIFI", name: "Wi-Fi", kind: .wifi, order: 1)
+        let usb = makeService("USB", name: "USB Ethernet", order: 3)
+        let dockB = makeService("B", name: "Dock B", order: 2)
+        let dockA = makeService("A", name: "Dock A", order: 2)
+        let sorted = [vpn, wifi, usb, dockB, dockA].sorted(by: NetworkServiceState.displaysBefore)
+        XCTAssertEqual(sorted.map(\.id), ["A", "B", "USB", "WIFI", "VPN"])
+    }
+
     func testKindsSortWiredFirstOtherLast() {
         let ranks = [NetworkServiceState.Kind.other, .aggregate, .vpn, .wifi, .wired].map(\.sortRank)
         XCTAssertEqual(ranks, ranks.sorted(by: >))

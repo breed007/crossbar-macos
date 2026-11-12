@@ -37,8 +37,9 @@ state, and a switch.
   another service, its label fades in there.
 - Warns before it surprises you. Turning off the service carrying your traffic
   first says what happens: "Traffic will move to Wi-Fi (Harbor Lane)", or "you'll go
-  offline". It always asks when you'd go offline or when an SSH or Screen Sharing
-  session could drop. Dormant services never ask.
+  offline". With a full-tunnel VPN connected, the network the VPN runs over counts
+  as carrying your traffic too. It always asks when you'd go offline or when an SSH
+  or Screen Sharing session could drop. Dormant services never ask.
 - Shows a service coming up. Right after you turn one on, its row says
   "Connecting…" until it gets an address.
 - Says what changed in the menu bar. After a toggle, "Wi-Fi off" shows next to
@@ -182,7 +183,8 @@ is enough to read the network name.
 
 Automations never show crossbar's confirmation (you set up the rule), but each one
 posts a notification saying what changed, including where your traffic went. When
-a Focus swaps one service for another, crossbar turns the new one on first, so you
+a Focus swaps one service for another, crossbar turns the new one on first and
+waits up to 15 seconds for it to connect before turning the old one off, so you
 aren't briefly offline.
 
 ## How it works
@@ -228,6 +230,13 @@ opens Apple's native pane.
 
 See [DESIGN.md](DESIGN.md) for the scope rules and the reasoning behind each
 non-goal.
+
+## Uninstall
+
+1. If you set up passwordless toggling, open crossbar, choose **Settings…**, and
+   click **Remove**. That unregisters the helper.
+2. Quit crossbar and drag it to the Trash, or run `brew uninstall --cask crossbar`.
+3. If you added the `sudo` rule, delete it: `sudo rm /etc/sudoers.d/crossbar`.
 
 ## Contributing
 
