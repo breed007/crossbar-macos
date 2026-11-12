@@ -80,10 +80,11 @@ struct AutomationToggle {
 
         // Turn-ons first, keeping the requested order within each group.
         let turnOns = changes.filter(\.enabled), turnOffs = changes.filter { !$0.enabled }
+        let turnOffIDs = turnOffs.map(\.serviceID)
         do {
             for (index, change) in (turnOns + turnOffs).enumerated() {
                 if index == turnOns.count, !turnedOn.isEmpty {
-                    await waitForRoutes(of: turnedOn, before: turnOffs)
+                    await waitForRoute(before: turnOffIDs)
                 }
                 let current = services()
                 guard let service = current.first(where: { $0.id == change.serviceID }) else {
@@ -92,7 +93,8 @@ struct AutomationToggle {
                     continue
                 }
                 guard service.isEnabled != change.enabled else { continue }
-                let prediction = change.enabled ? nil : RoutePrediction.disabling(service.id, in: current).sentence
+                let prediction = change.enabled ? nil
+                    : RoutePrediction.disabling(service.id, in: current, alongWith: turnOffIDs).sentence
 
                 do {
                     try await setEnabled(change.enabled, service.id, service.name)
@@ -117,21 +119,20 @@ struct AutomationToggle {
         return applied
     }
 
-    /// Before a turn-off that would take away the service carrying traffic, give the
-    /// services just turned on time to get a router, so traffic has somewhere to go.
-    /// Returns early once they're all connected; gives up after `routeWait`.
-    private func waitForRoutes(of turnedOn: [String], before turnOffs: [Change]) async {
-        func needsWait() -> Bool {
+    /// Before turn-offs that would leave nothing carrying traffic, give the services
+    /// just turned on time to connect. Stops as soon as one has a route to hand off to,
+    /// so a turned-on service that never gets a router (a bridge, a VPN) doesn't hold
+    /// things up; gives up after `routeWait`.
+    private func waitForRoute(before turnOffIDs: [String]) async {
+        func wouldGoOffline() -> Bool {
             let current = services()
-            let takesActiveRoute = turnOffs.contains {
-                RoutePrediction.disabling($0.serviceID, in: current) != .notActiveRoute
+            return turnOffIDs.contains {
+                RoutePrediction.disabling($0, in: current, alongWith: turnOffIDs) == .offline
             }
-            let allConnected = turnedOn.allSatisfy { id in current.first { $0.id == id }?.router != nil }
-            return takesActiveRoute && !allConnected
         }
         let polls = Int(Self.routeWait / Self.routePollInterval)
         for _ in 0..<polls {
-            guard needsWait() else { return }
+            guard wouldGoOffline() else { return }
             await pause()
         }
     }

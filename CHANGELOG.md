@@ -18,11 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   underneath it.
 - A switch could stay grayed out after a toggle if the network changed while the
   toggle was in progress.
-- A call to the helper now gives up after 20 seconds, like the `sudo` fallback, and
-  then tries the fallback. Before, a stuck helper left the switch frozen and a
-  shortcut waiting forever.
-- Shortcuts and Focus filters announce the changes they made even when a later
-  change fails. A Focus filter that names a service that no longer exists says so.
+- A call to the helper now gives up after 20 seconds and then tries the `sudo`
+  fallback, which has its own 20-second limit. Before, a stuck helper left the
+  switch frozen and a shortcut waiting forever.
+- A Focus filter announces the changes it made even when a later change fails, and
+  says so when it names a service that no longer exists.
+- A Focus that turns off every connected service at once now says you'll go
+  offline, instead of naming one of them as where traffic will move.
 - Holding Space on a row no longer turns the service on and then off again.
 - A Wi-Fi network name made only of spaces no longer leaves the menu bar text blank.
 - VoiceOver no longer reads a stale on/off state for a switch you just clicked.

@@ -29,6 +29,15 @@ enum RoutePrediction: Equatable {
         return successor.map { .handoff(to: $0) } ?? .offline
     }
 
+    /// The same, for one of several services being turned off together: the others
+    /// count as already off, so turning off Ethernet and Wi-Fi together predicts
+    /// "offline", not a move to Wi-Fi.
+    static func disabling(_ serviceID: String, in services: [NetworkServiceState],
+                          alongWith others: [String]) -> RoutePrediction {
+        let goingOff = Set(others).subtracting([serviceID])
+        return disabling(serviceID, in: services.map { goingOff.contains($0.id) ? $0.turnedOff : $0 })
+    }
+
     /// The primary service, or the link a primary VPN runs over.
     private static func carriesTraffic(_ service: NetworkServiceState, in services: [NetworkServiceState]) -> Bool {
         if service.isPrimary { return true }

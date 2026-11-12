@@ -69,6 +69,13 @@ struct NetworkServiceState: Identifiable, Equatable {
 }
 
 extension NetworkServiceState {
+    /// This service as it will look once disabled: no address, no route.
+    var turnedOff: NetworkServiceState {
+        NetworkServiceState(id: id, name: name, bsdName: bsdName, isEnabled: false, ipv4Address: nil,
+                            router: nil, hasActiveLink: false, isPrimary: false, kind: kind, ssid: nil,
+                            orderIndex: orderIndex)
+    }
+
     /// The popover's order: by category (wired → Wi-Fi → VPN → bridges → other),
     /// then by the configured service order within a category, then by name.
     static func displaysBefore(_ a: NetworkServiceState, _ b: NetworkServiceState) -> Bool {

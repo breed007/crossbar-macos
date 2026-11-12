@@ -95,6 +95,32 @@ final class AutomationToggleTests: XCTestCase {
         XCTAssertEqual(net.calls.map(\.1), ["WIFI", "BR"])
     }
 
+    func testTurningOffEveryLinkTogetherSaysOffline() async throws {
+        let net = FakeNetwork([
+            makeService("ETH", name: "Ethernet", router: "10.0.0.1", primary: true, order: 0),
+            makeService("WIFI", name: "Wi-Fi", router: "192.168.1.1", kind: .wifi, order: 1),
+        ])
+        for order in [["ETH", "WIFI"], ["WIFI", "ETH"]] {
+            net.services = [makeService("ETH", name: "Ethernet", router: "10.0.0.1", primary: true, order: 0),
+                            makeService("WIFI", name: "Wi-Fi", router: "192.168.1.1", kind: .wifi, order: 1)]
+            net.announcements = []
+            try await net.automation.run(order.map { .init(serviceID: $0, enabled: false) }, source: .focus)
+            guard case .changed(_, _, let consequence) = net.announcements.first else { return XCTFail() }
+            XCTAssertEqual(consequence, "Nothing else is connected, so you’ll go offline.", "order \(order)")
+        }
+    }
+
+    func testTheWaitEndsWhenAnyNewServiceCanTakeOver() async throws {
+        let net = FakeNetwork([
+            makeService("ETH", name: "Ethernet", router: "10.0.0.1", primary: true, order: 0),
+            makeService("WIFI", name: "Wi-Fi", enabled: false, router: "192.168.1.1", kind: .wifi, order: 1),
+            makeService("BR", name: "Thunderbolt Bridge", enabled: false, kind: .aggregate, order: 2),
+        ])
+        try await net.automation.run([.init(serviceID: "WIFI", enabled: true), .init(serviceID: "BR", enabled: true),
+                                      .init(serviceID: "ETH", enabled: false)], source: .focus)
+        XCTAssertEqual(net.pauses, 2, "the bridge never gets a router, but Wi-Fi does")
+    }
+
     func testTheFirstConsequenceIsKept() async throws {
         let net = FakeNetwork([
             makeService("ETH", name: "Ethernet", router: "10.0.0.1", primary: true, order: 0),
