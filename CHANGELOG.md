@@ -5,7 +5,7 @@ All notable changes to crossbar are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.1] — unreleased
+## [0.6.1] — 2026-11-12
 
 ### Fixed
 - A Focus that swaps one service for another now waits for the new service to
@@ -196,6 +196,7 @@ First release.
 - **Application icon** (globe + crossbar) for Finder and Get Info.
 - **Universal** build (Apple Silicon + Intel).
 
+[0.6.1]: https://github.com/breed007/crossbar-macos/releases/tag/v0.6.1
 [0.6.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.6.0
 [0.5.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.5.0
 [0.4.0]: https://github.com/breed007/crossbar-macos/releases/tag/v0.4.0
