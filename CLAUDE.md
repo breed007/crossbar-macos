@@ -63,6 +63,12 @@ non-goals), and `docs/backend-b-design.md` before touching the helper.
   appearance, not the app's, so demo mode sets `popover.appearance` explicitly. The
   NSAlert's backdrop sits just below `.modalPanel`, everything else just below
   `.popUpMenu`. The script waits until a window's bounds read the same twice in a row.
+- Update check (v0.7, `Updates/`): `UpdateCheck` holds the pure rules (version
+  compare, release parsing, URL check, Homebrew, managed policy), `UpdateChecker`
+  fetches and remembers. Opt-in, notify only, never installs. Switchback has its
+  own copy with its own `Product`; keep them in step. `--update-check [version]`
+  runs it from a Debug build. `--demo popover-ask|popover-update|popover-many`
+  shows the update rows and a long scrolling list.
 - The App Intents file is excluded from the test bundle, or the test process
   registers App Shortcuts with the system (learned in Switchback).
 

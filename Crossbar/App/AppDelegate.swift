@@ -7,5 +7,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItemController = StatusItemController()
+        UpdateChecker.shared.start()   // does nothing unless the user turned checks on
     }
 }

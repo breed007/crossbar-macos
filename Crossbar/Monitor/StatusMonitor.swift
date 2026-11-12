@@ -78,6 +78,7 @@ final class StatusMonitor: ObservableObject {
         let callback: SCDynamicStoreCallBack = { _, _, info in
             guard let info else { return }
             let monitor = Unmanaged<StatusMonitor>.fromOpaque(info).takeUnretainedValue()
+            HiddenInterfaces.invalidate()   // the interface behind a BSD name may have changed
             monitor.scheduleRefresh()
         }
 
@@ -143,7 +144,7 @@ final class StatusMonitor: ObservableObject {
     static func readServices(store: SCDynamicStore? = nil,
                              ssid: (String) -> String? = { _ in nil }) -> [NetworkServiceState] {
         #if DEBUG
-        if DemoData.active { return DemoData.services }
+        if DemoData.active { return DemoData.shownServices }
         #endif
         // A fresh SCPreferences snapshot reflects the latest on-disk config, so
         // enable/disable changes made in System Settings show up here.

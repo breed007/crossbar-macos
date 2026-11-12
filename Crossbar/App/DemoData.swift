@@ -8,6 +8,22 @@ import AppKit
 enum DemoData {
     static var active = false
 
+    /// Which update row the demo popover shows: none (README screenshots), the
+    /// one-time question, or "available".
+    enum UpdateRow { case none, ask, available }
+    static var updateRow = UpdateRow.none
+
+    /// Pad the list with VPN profiles to check that a long list scrolls (v0.7 R2).
+    static var manyServices = false
+    static var shownServices: [NetworkServiceState] {
+        guard manyServices else { return services }
+        return services + (1...40).map {
+            NetworkServiceState(id: "demo-vpn-\($0)", name: "Client VPN \($0)", bsdName: nil, isEnabled: false,
+                                ipv4Address: nil, router: nil, hasActiveLink: false,
+                                isPrimary: false, kind: .vpn, ssid: nil, orderIndex: 10 + $0)
+        }
+    }
+
     /// Private (RFC 1918) addresses and made-up names, not this Mac's. Already in the
     /// popover's display order (wired, Wi-Fi, VPN, bridge).
     static let services: [NetworkServiceState] = [

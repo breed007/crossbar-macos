@@ -19,7 +19,9 @@ import SystemConfiguration
 ///   --login-item [on|off]              print, or set, Launch at Login
 ///   --snapshot <dir>                   render the popover (live and sample) and Settings to PNGs
 ///   --ui-selftest                      drive the popover with key events and check the menu bar flash
-///   --demo <view> [light|dark]         show popover, warning, or settings with sample data, until killed
+///   --demo <view> [light|dark]         show popover, popover-ask, popover-update, warning, or settings
+///                                      with sample data, until killed
+///   --update-check [installedVersion]  ask GitHub for the latest release, as if this version were installed
 enum DebugCommands {
     /// Returns an exit code if a debug flag was handled, or nil to launch normally.
     static func run(_ args: [String]) -> Int32? {
@@ -63,6 +65,23 @@ enum DebugCommands {
             }
             return 0
 
+        case "--update-check":
+            // Uses a throwaway preferences suite, so nothing is remembered.
+            let suite = UserDefaults(suiteName: "com.breed.Crossbar.debug-update")!
+            suite.removePersistentDomain(forName: "com.breed.Crossbar.debug-update")
+            let installed = args.count >= 3 ? UpdateCheck.Version(args[2]) : nil
+            let outcome: UpdateChecker.Outcome = MainActor.assumeIsolated {
+                let checker = UpdateChecker(preferences: Preferences(suite), installed: installed)
+                var result: UpdateChecker.Outcome?
+                Task { result = await checker.checkNow() }
+                while result == nil { RunLoop.main.run(until: Date().addingTimeInterval(0.1)) }
+                return result!
+            }
+            print(outcome)
+            print("homebrew install: \(UpdateCheck.installedWithHomebrew())")
+            print("disabled by policy: \(UpdateCheck.disabledByPolicy(bundleID: "com.breed.Crossbar"))")
+            return outcome == .failed ? 1 : 0
+
         case "--predict":
             guard args.count >= 3 else { print("usage: --predict <serviceID>"); return 64 }
             let prediction = RoutePrediction.disabling(args[2], in: StatusMonitor.readServices())
@@ -80,7 +99,11 @@ enum DebugCommands {
             app.setActivationPolicy(.accessory)
             if args.count >= 4 { app.appearance = NSAppearance(named: args[3] == "light" ? .aqua : .darkAqua) }
             let controller = StatusItemController()
-            let view = args.count >= 3 ? args[2] : "popover"
+            var view = args.count >= 3 ? args[2] : "popover"
+            // popover-ask and popover-update show the v0.7 update rows; not in the README.
+            if view == "popover-ask" { DemoData.updateRow = .ask; view = "popover" }
+            if view == "popover-update" { DemoData.updateRow = .available; view = "popover" }
+            if view == "popover-many" { DemoData.manyServices = true; view = "popover" }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { controller.debugDemo(view) }
             app.run()   // until killed
             return 0

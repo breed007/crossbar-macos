@@ -18,6 +18,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let setUpButton = NSButton(title: "Set Up…", target: nil, action: nil)
     private let loginItemsButton = NSButton(title: "Open Login Items", target: nil, action: nil)
     private let removeButton = NSButton(title: "Remove", target: nil, action: nil)
+    private let checkUpdates = NSButton(checkboxWithTitle: "Check for updates once a day", target: nil, action: nil)
+    private let checkNowButton = NSButton(title: "Check Now", target: nil, action: nil)
+    private let updateResult = SettingsWindowController.note("")
+    private let updateNote = SettingsWindowController.note(
+        "Crossbar asks GitHub for the latest release and sends nothing about this Mac. It never installs anything itself.")
+    private let updatePolicyNote = SettingsWindowController.note("Update checks are turned off by your organization.")
 
     private init() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
@@ -27,6 +33,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
         buildContent()
+        // The popover's update question can change the checkbox while this is open.
+        NotificationCenter.default.addObserver(forName: .crossbarUpdateStateChanged, object: nil,
+                                               queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -49,13 +60,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                                  (confirmHandoff, #selector(toggleConfirmHandoff)),
                                  (setUpButton, #selector(setUpHelper)),
                                  (loginItemsButton, #selector(openLoginItems)),
-                                 (removeButton, #selector(removeHelper))] {
+                                 (removeButton, #selector(removeHelper)),
+                                 (checkUpdates, #selector(toggleCheckUpdates)),
+                                 (checkNowButton, #selector(checkNow))] {
             button.target = self
             button.action = action
         }
         setUpButton.bezelStyle = .push
         loginItemsButton.bezelStyle = .push
         removeButton.bezelStyle = .push
+        checkNowButton.bezelStyle = .push
+        let checkNowRow = NSStackView(views: [checkNowButton, updateResult])
+        checkNowRow.spacing = 8
         helperStatus.font = .systemFont(ofSize: 13)
 
         let helperButtons = NSStackView(views: [setUpButton, loginItemsButton, removeButton])
@@ -71,11 +87,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             helperStatus,
             helperButtons,
             Self.note("Without the helper, Crossbar uses the sudo rule described in the README."),
+            Self.heading("Updates"),
+            checkUpdates,
+            checkNowRow,
+            updateNote,
+            updatePolicyNote,
         ])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
         stack.setCustomSpacing(18, after: stack.arrangedSubviews[5])
+        stack.setCustomSpacing(18, after: stack.arrangedSubviews[9])
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 24, bottom: 22, right: 24)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
@@ -126,6 +148,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         case .notRegistered, .notFound:
             helperStatus.stringValue = "Not set up."
         }
+        let updates = UpdateChecker.shared
+        let managed = updates.isDisabledByPolicy
+        checkUpdates.state = updates.isAutomatic ? .on : .off
+        for view in [checkUpdates, checkNowRow(), updateNote] { view?.isHidden = managed }
+        updatePolicyNote.isHidden = !managed
         setUpButton.isHidden = status == .enabled
         loginItemsButton.isHidden = status != .requiresApproval
         removeButton.isHidden = status == .notRegistered || status == .notFound
@@ -157,6 +184,26 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func toggleConfirmHandoff() {
         preferences.confirmRouteHandoff = confirmHandoff.state == .on
+    }
+
+    private func checkNowRow() -> NSView? { checkNowButton.superview }
+
+    @objc private func toggleCheckUpdates() {
+        UpdateChecker.shared.setAutomatic(checkUpdates.state == .on)
+    }
+
+    @objc private func checkNow() {
+        checkNowButton.isEnabled = false
+        updateResult.stringValue = "Checking…"
+        Task { @MainActor in
+            let name = UpdateCheck.product.displayName
+            switch await UpdateChecker.shared.checkNow() {
+            case .upToDate(let version): updateResult.stringValue = "\(name) \(version) is up to date."
+            case .available(let release): updateResult.stringValue = "\(name) \(release.version) is available."
+            case .failed: updateResult.stringValue = "Couldn’t get the latest release from GitHub."
+            }
+            checkNowButton.isEnabled = true
+        }
     }
 
     @objc private func setUpHelper() {

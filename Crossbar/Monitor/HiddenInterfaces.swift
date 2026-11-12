@@ -26,6 +26,13 @@ enum HiddenInterfaces {
         return hidden
     }
 
+    /// Forget what's cached. Called on every network change: an adapter plugged in
+    /// later can get the BSD name of one that was unplugged.
+    static func invalidate() {
+        lock.lock(); defer { lock.unlock() }
+        cache.removeAll()
+    }
+
     /// Whether the interface with this BSD name (e.g. "en4") is hidden. Interfaces
     /// with no registry entry (virtual ones such as bridge0) are not hidden.
     static func isHidden(bsdName: String) -> Bool {
