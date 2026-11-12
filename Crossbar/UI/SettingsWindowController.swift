@@ -33,6 +33,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
         buildContent()
+        // The popover's update question can change the checkbox while this is open.
+        NotificationCenter.default.addObserver(forName: .crossbarUpdateStateChanged, object: nil,
+                                               queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -195,7 +200,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             switch await UpdateChecker.shared.checkNow() {
             case .upToDate(let version): updateResult.stringValue = "\(name) \(version) is up to date."
             case .available(let release): updateResult.stringValue = "\(name) \(release.version) is available."
-            case .failed: updateResult.stringValue = "Couldn’t reach GitHub."
+            case .failed: updateResult.stringValue = "Couldn’t get the latest release from GitHub."
             }
             checkNowButton.isEnabled = true
         }

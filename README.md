@@ -225,10 +225,11 @@ and security model. Built in Swift and AppKit, with no third-party dependencies.
 
 - crossbar has no telemetry or analytics. It reads local system configuration
   and toggles local services.
-- Its only network request is the update check, and only if you turn it on: at
-  most once a day, a request to GitHub's API for crossbar's latest release. It
-  sends no cookies and nothing about your Mac or your networks; GitHub sees your IP
-  address, as it would for any web request. Off until you say yes.
+- Its only network request is the update check: a request to GitHub's API for
+  crossbar's latest release, at most once a day if you turn checks on, or when you
+  click Check Now in Settings. It sends no cookies and nothing about your Mac or your
+  networks; GitHub sees your IP address, as it would for any web request. Nothing is
+  sent until you turn checks on or click Check Now.
 - Location permission, if granted, is used only to read your Wi-Fi network
   name locally. It never leaves your Mac, and crossbar requests no location updates.
 - Notifications are posted only for changes made by Shortcuts or a Focus.
